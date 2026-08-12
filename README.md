@@ -1,131 +1,225 @@
-<h1 align="center">FreeITSM</h1>
+# ICCTECH: Adapted IT Service Management Solution
 
-<p align="center"><strong>Free, open-source IT Service Management — self-hosted, AI-included, no per-seat fees. Ever.</strong></p>
+> **University of Ghana — CSCD602 Advanced Software Engineering**<br>
+> Individual Project-Based Examination, First Semester 2025/2026
 
-<p align="center">
-<a href="https://github.com/edmozley/freeitsm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/edmozley/freeitsm?style=flat-square&color=blue" alt="MIT License"></a>
-<img src="https://img.shields.io/badge/PHP-7.4--8.4-777BB4?style=flat-square&logo=php&logoColor=white" alt="PHP 7.4–8.4">
-<img src="https://img.shields.io/badge/MySQL-8.0%2B-4479A1?style=flat-square&logo=mysql&logoColor=white" alt="MySQL 8.0+">
-<img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Ready">
-<a href="https://github.com/edmozley/freeitsm/stargazers"><img src="https://img.shields.io/github/stars/edmozley/freeitsm?style=flat-square&color=gold" alt="GitHub stars"></a>
-</p>
+| Item | Details |
+| --- | --- |
+| Student developer / project owner | [Clemzy123](https://github.com/Clemzy123) |
+| Student name | **[Add full name before submission]** |
+| Student ID | **[Add student ID before submission]** |
+| Project status | Functional adaptation and deployment project |
+| Live application | **[Add deployed application URL]** |
+| Source repository | [github.com/Clemzy123/ICCTECH](https://github.com/Clemzy123/ICCTECH) |
 
-<p align="center">
-🌍 <a href="https://freeitsm.co.uk">freeitsm.co.uk</a> &nbsp;·&nbsp;
-📖 <a href="https://github.com/edmozley/freeitsm/wiki">Documentation Wiki</a> &nbsp;·&nbsp;
-💬 <a href="https://github.com/edmozley/freeitsm/discussions">Discussions</a> &nbsp;·&nbsp;
-🐛 <a href="https://github.com/edmozley/freeitsm/issues">Issues</a>
-</p>
+## 1. Project overview
 
----
+ICCTECH is an adapted, self-hosted IT Service Management (ITSM) solution for organisations that need a central place to log, assign, track and resolve IT support requests. The project configures and deploys a usable service-management environment based on the FreeITSM open-source platform, with a focused evaluation scope suitable for the CSCD602 48-hour capstone examination.
 
-FreeITSM is a complete web-based ITSM platform: **22 integrated modules** covering tickets, assets, knowledge, changes, problems, tasks, a CMDB, workflows, an LMS and more — plus a **self-service portal** for your end users. It runs on a plain PHP + MySQL stack (WAMP, XAMPP, LAMP, or Docker), so your data stays on your server.
+### Problem statement
 
-**Why teams pick it:**
+IT support work is often managed through informal messages, email threads and spreadsheets. This makes request ownership, status visibility, communication history and service reporting difficult to manage. ICCTECH provides a web-based workspace that centralises support tickets, users, assets, knowledge and related operational records.
 
-- 🆓 **Genuinely free** — MIT licence, no per-seat/per-agent fees, no "Enterprise tier". Everything ships to everyone.
-- 🏠 **Self-hosted** — your tickets, your customers' conversations and your knowledge base live in your database, under your backups and your privacy policy.
-- 🤖 **AI included, not upsold** — reply cleanup, knowledge Q&A, form generation, course authoring, RCA drafting and more, all bring-your-own-key (Anthropic, OpenAI, or OpenRouter).
-- 📥 **Every channel becomes a ticket** — email (Microsoft 365, Gmail, IMAP), WhatsApp, Slack, an embeddable web chat widget, and a portal that even staff **without a company email address** can use.
+### Aim
 
-## Screenshots
+To deliver and document a deployable ITSM solution that improves the recording, assignment, tracking and resolution of IT support requests while demonstrating disciplined advanced software-engineering practice.
 
-<table>
-<tr>
-<td align="center"><strong>Watchtower</strong><br><img src="https://freeitsm.co.uk/images/screenshots/watchtower_1.png" width="350" alt="Watchtower"></td>
-<td align="center"><strong>Tickets</strong><br><img src="https://freeitsm.co.uk/images/screenshots/tickets_1.png" width="350" alt="Tickets"></td>
-<td align="center"><strong>Assets</strong><br><img src="https://freeitsm.co.uk/images/screenshots/assets_1.png" width="350" alt="Assets"></td>
-</tr>
-<tr>
-<td align="center"><strong>Knowledge</strong><br><img src="https://freeitsm.co.uk/images/screenshots/knowledge_1.png" width="350" alt="Knowledge"></td>
-<td align="center"><strong>Changes</strong><br><img src="https://freeitsm.co.uk/images/screenshots/changes_1.png" width="350" alt="Changes"></td>
-<td align="center"><strong>Calendar</strong><br><img src="https://freeitsm.co.uk/images/screenshots/calendar_1.png" width="350" alt="Calendar"></td>
-</tr>
-</table>
+### Objectives
 
-<p align="center"><a href="https://freeitsm.co.uk/screenshots.html"><strong>View all 57 screenshots →</strong></a></p>
+- Analyse the support-management problem and define prioritised requirements.
+- Configure, adapt and deploy the selected ITSM platform for the identified use case.
+- Demonstrate core ticket, user-access, knowledge and asset-management workflows.
+- Test the implemented scope and document defects, limitations and technical debt.
+- Produce a maintainable deployment and an evolution plan.
 
-## 🚀 Quick Start
+### Stakeholders and intended users
 
-The fastest route is Docker — no PHP, MySQL or web server setup required:
+| Stakeholder | Interest / role |
+| --- | --- |
+| Support analysts | Receive, assign, update and resolve service requests. |
+| End users | Submit requests, view progress and access self-service information. |
+| IT manager / administrator | Configure users, permissions, service processes and reports. |
+| Organisation management | Monitor service quality and operational trends. |
+| Student developer | Owns the documented adaptation, configuration, validation and deployment work. |
+
+## 2. Scope and features
+
+The examination scope focuses on a working service-desk workflow rather than attempting to claim authorship of, or independently recreate, the complete upstream platform.
+
+### In-scope capabilities
+
+- Authentication and role-based access for analysts and end users.
+- Ticket logging, categorisation, assignment, communication, status tracking and resolution.
+- End-user self-service portal and knowledge-base access.
+- Asset records associated with support operations.
+- Administrative configuration, basic audit/reporting views and database-backed persistence.
+- Responsive web access through a PHP and MySQL deployment.
+
+### Out of scope for this examination submission
+
+- Development of every module and integration present in the upstream FreeITSM platform.
+- Production-scale integrations requiring external credentials, such as enterprise SSO, email, WhatsApp, Slack, Intune or AI providers, unless separately configured and evidenced.
+- A claim that the entire upstream application was developed during the 48-hour examination period.
+
+## 3. Requirements and SRS summary
+
+### Functional requirements
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-01 | Users shall be able to authenticate according to their assigned role. | Must |
+| FR-02 | End users shall be able to create and view support tickets. | Must |
+| FR-03 | Analysts shall be able to assign, update, communicate on and resolve tickets. | Must |
+| FR-04 | Administrators shall be able to manage users, permissions and service settings. | Must |
+| FR-05 | Users shall be able to search and read relevant knowledge articles. | Should |
+| FR-06 | Analysts shall be able to record and view asset information. | Should |
+| FR-07 | Administrators shall be able to view operational/audit information. | Could |
+
+### Non-functional requirements
+
+- **Usability:** core ticket actions should be understandable without specialist training.
+- **Security:** authenticated access, role-based permissions, input validation and secure handling of configuration secrets are required.
+- **Reliability:** data must persist in MySQL and failures must produce actionable messages.
+- **Compatibility:** the solution must run on PHP 7.4–8.4 with MySQL 8.0+ and a PHP-capable web server.
+- **Deployability:** a local Docker-based setup must be available; the live deployment URL must be verified before submission.
+
+### Prioritisation method
+
+MoSCoW prioritisation was used. “Must” requirements define the minimum viable, demonstrable service-desk workflow; “Should” requirements improve operational usefulness; “Could” requirements are deferred when time is constrained.
+
+## 4. Effort estimation and lifecycle
+
+### Estimation approach
+
+The project uses expert estimation with timeboxing because the examination has a fixed 48-hour duration and the work is a scoped adaptation/deployment rather than greenfield development. Estimates guide what evidence and configuration can be completed without compromising the required core workflow.
+
+| Activity | Estimated hours |
+| --- | ---: |
+| Requirements, scope and estimation | 6 |
+| Analysis and design artefacts | 6 |
+| Environment setup, configuration and adaptation | 17 |
+| Testing and defect correction | 7 |
+| Deployment and production verification | 4 |
+| Documentation and submission checks | 8 |
+| **Total** | **48** |
+
+**Assumptions:** a suitable PHP/MySQL or Docker environment is available; the upstream codebase is available under its licence; and external service credentials are not required for the minimum scope.<br>
+**Constraint:** the 48-hour examination limit requires strict prioritisation and documented deferral of non-core work.
+
+## 5. Analysis and design
+
+### Architecture
+
+```text
+End user / Support analyst
+           |
+           v
+Browser interface (self-service portal / analyst workspace)
+           |
+           v
+PHP application modules and authentication/authorisation layer
+           |
+           v
+MySQL database (tickets, users, assets, knowledge and audit data)
+```
+
+### Core ticket workflow
+
+```text
+Ticket submitted -> Categorised -> Assigned -> In progress
+                                      |             |
+                                      v             v
+                                  Updated <--- Analyst response
+                                                    |
+                                                    v
+                                             Resolved / Closed
+```
+
+The detailed SRS, use cases, data model, UI evidence and selected design diagrams should be included in the submitted `Project_Documentation.pdf` or linked supporting documentation.
+
+## 6. Technology and local setup
+
+- PHP 7.4–8.4
+- MySQL 8.0+
+- Apache or another PHP-capable web server
+- Vanilla JavaScript and TinyMCE
+- Docker Compose (recommended for local evaluation)
 
 ```bash
-git clone https://github.com/edmozley/freeitsm.git
-cd freeitsm
+git clone https://github.com/Clemzy123/ICCTECH.git
+cd ICCTECH
 docker compose up -d
 ```
 
-Then open [http://localhost:8080/setup/](http://localhost:8080/setup/) to verify the installation and create your admin account.
+Open `http://localhost:8080/setup/` to complete local installation. Configure the database and application secrets before using the system. Do not publish default or real credentials in a public repository.
 
-- **Manual install** (WAMP / XAMPP / LAMP): follow the **[Installation guide](https://github.com/edmozley/freeitsm/wiki/Installation)** — prerequisites, database setup, encryption key, and configuration files.
-- **First login**: `admin` / `freeitsm` — change it immediately via the account menu.
-- **Demo data**: System → Demo Data populates every module with realistic sample data, so you can evaluate with the system feeling alive.
+## 7. Testing and quality assurance
 
-## Modules
+Testing evidence must record the date, environment, expected result, actual result, pass/fail outcome, defects and corrective action. Complete this table with executed results before submission.
 
-| Module | What it does |
-|--------|--------------|
-| [Watchtower](https://github.com/edmozley/freeitsm/wiki/Watchtower) | Unified attention dashboard — one glance shows what needs you across every module |
-| [Tickets](https://github.com/edmozley/freeitsm/wiki/Tickets) | Outlook-style inbox with email, WhatsApp, Slack and web chat channels, SLAs, CSAT, canned responses, multi-select bulk actions, snooze, collision detection, AI reply cleanup |
-| [Self-Service Portal](https://github.com/edmozley/freeitsm/wiki/Self-Service-Portal) | End-user portal — request catalogue, knowledge, replies, screen recording; works even with no email address |
-| [Tasks](https://github.com/edmozley/freeitsm/wiki/Tasks) | Kanban board, list, calendar and timeline views for internal work |
-| [Assets](https://github.com/edmozley/freeitsm/wiki/Assets) | Asset register with custody tracking, locations, warranties, [QR labels and an in-app camera scanner for stocktakes](https://github.com/edmozley/freeitsm/wiki/Asset-QR-Labels), vCenter and Intune sync |
-| [Knowledge](https://github.com/edmozley/freeitsm/wiki/Knowledge) | Rich-text articles with AI chat, vector search, review workflow and per-audience visibility |
-| [Change Management](https://github.com/edmozley/freeitsm/wiki/Change-Management) | ITIL changes with CAB voting, risk matrix and post-implementation review |
-| [Problem Management](https://github.com/edmozley/freeitsm/wiki/Problem-Management) | Root causes behind recurring incidents, known errors, AI-assisted RCA |
-| [Workflows](https://github.com/edmozley/freeitsm/wiki/Workflows) | Cross-module automation — visual canvas, 138+ triggers, outbound webhooks, AI co-author |
-| [CMDB](https://github.com/edmozley/freeitsm/wiki/CMDB) | Typed configuration items with relationships, impact analysis and AI summaries |
-| [Network Mapper](https://github.com/edmozley/freeitsm/wiki/Network-Mapper) | Architecture diagrams where every node is bound to a real CMDB object |
-| [Calendar](https://github.com/edmozley/freeitsm/wiki/Calendar) | Team calendar with categories, and an iCal feed for your phone |
-| [Morning Checks](https://github.com/edmozley/freeitsm/wiki/Morning-Checks) | Daily infrastructure health checks with trend charts and PDF export |
-| [Reporting](https://github.com/edmozley/freeitsm/wiki/Reporting) | System logs, audit trails, and an Intune device dashboard with drill-down |
-| [Software](https://github.com/edmozley/freeitsm/wiki/Software) | Software inventory from an agent script, plus licence management |
-| [Forms](https://github.com/edmozley/freeitsm/wiki/Forms) | Dynamic form builder with AI assist, section headings, conditional questions, versioning and submissions reporting |
-| [Contracts](https://github.com/edmozley/freeitsm/wiki/Contracts) | Supplier and contract lifecycle, plus an AI-powered RFP Builder |
-| [Service Status](https://github.com/edmozley/freeitsm/wiki/Service-Status) | Service health dashboard driven by incident tracking |
-| [War Room](https://github.com/edmozley/freeitsm/wiki/War-Room) | Chat on your own server for when Teams, Slack or the internet are down — channels, direct messages, search, attachments, and an AI situation report that drafts the update to the business |
-| [LMS](https://github.com/edmozley/freeitsm/wiki/LMS) | Author courses in-app (with AI) or upload SCORM; assign, take and track them |
-| [Process Mapper](https://github.com/edmozley/freeitsm/wiki/Process-Mapper) | Flowchart builder with swimlanes, custom step types and Mermaid export |
-| [System](https://github.com/edmozley/freeitsm/wiki/System) | Administration — analysts, teams, roles, encryption, database verify, demo data |
+| Test ID | Scenario | Expected result | Actual result | Status |
+| --- | --- | --- | --- | --- |
+| TC-01 | Analyst authentication | Valid analyst reaches authorised workspace. | **[Record result]** | **[Pass/Fail]** |
+| TC-02 | End user submits a ticket | Ticket is stored and receives a reference/status. | **[Record result]** | **[Pass/Fail]** |
+| TC-03 | Analyst updates/assigns ticket | Changes persist and are visible to authorised users. | **[Record result]** | **[Pass/Fail]** |
+| TC-04 | Role access check | Restricted functions are unavailable to unauthorised users. | **[Record result]** | **[Pass/Fail]** |
+| TC-05 | Knowledge search | Relevant visible article can be found and opened. | **[Record result]** | **[Pass/Fail]** |
+| TC-06 | Production smoke test | Deployed URL loads and core ticket workflow works. | **[Record result]** | **[Pass/Fail]** |
 
-A **System Wiki** module also auto-documents the codebase from within the app, and a [browser extension](https://github.com/edmozley/freeitsm/wiki/Browser-Extension) puts the Watchtower badge count in your Chrome/Edge toolbar.
+## 8. Technical debt register
 
-## Highlights
+| Debt | Cause | Impact | Priority | Proposed resolution |
+| --- | --- | --- | --- | --- |
+| Unconfigured external integrations | 48-hour scope and unavailable provider credentials. | Some communication channels are not demonstrated. | Medium | Configure and test integrations in a later release using secured service accounts. |
+| Limited project-specific automated tests | Timeboxed adaptation work. | Regression confidence is reduced for local changes. | High | Add a repeatable automated test suite for every project-specific change. |
+| Documentation placeholders | Personal/deployment details are pending verification. | Submission evidence is incomplete if left unresolved. | Critical | Replace all bracketed placeholders and validate links before Sakai submission. |
+| Broad upstream feature set | The base platform exceeds examination scope. | Reviewers may not distinguish reused and original work. | High | Maintain a change log and clearly document every student-authored adaptation. |
 
-- **[REST API](https://github.com/edmozley/freeitsm/wiki/REST-API)** — 200+ key-authenticated endpoints with granular per-key permissions, a live OpenAPI spec, and interactive in-app docs with code samples in seven languages.
-- **[Single Sign-On](https://github.com/edmozley/freeitsm/wiki/Single-Sign-On) & [LDAP / Active Directory](https://github.com/edmozley/freeitsm/wiki/LDAP-and-Active-Directory)** — OIDC providers side by side (Keycloak, Entra, Okta, …), or bind straight to your on-prem directory with group-gated just-in-time provisioning. Local login always remains as break-glass.
-- **[Security](https://github.com/edmozley/freeitsm/wiki/Security)** — AES-256-GCM encryption at rest for secrets, TOTP MFA, brute-force protection, role-based permissions down to individual settings tabs, and audit trails throughout.
-- **[Multi-tenancy](https://github.com/edmozley/freeitsm/wiki/Multi-Tenancy)** — host multiple client companies in one install (built for MSPs), each walled off from the others. Invisible until you add a second company.
-- **[Webhooks](https://github.com/edmozley/freeitsm/wiki/Webhooks)** — push any event to Slack, Teams, Discord or any endpoint, with HMAC signing, retries and a delivery dashboard.
-- **Command palette** — press **⌘K / Ctrl-K** anywhere to jump to any module, search across tickets, changes, problems, knowledge, contracts, assets and CMDB items by name or reference, or run a quick action, all from the keyboard. Results respect your module access and active company.
-- **Internationalisation** — [24 languages](https://github.com/edmozley/freeitsm/wiki/Internationalisation) with per-analyst locale, plus [per-analyst timezones](https://github.com/edmozley/freeitsm/wiki/Timezones-and-Time-Handling), [theming and dark mode](https://github.com/edmozley/freeitsm/wiki/Theming-and-Dark-Mode), and a [mobile-friendly](https://github.com/edmozley/freeitsm/wiki/Mobile-Friendly) core flow — the [ticket inbox](https://github.com/edmozley/freeitsm/wiki/Mobile-Friendly-Tickets), [Assets](https://github.com/edmozley/freeitsm/wiki/Mobile-Friendly-Assets), the [Calendar](https://github.com/edmozley/freeitsm/wiki/Mobile-Friendly-Calendar), the [Knowledge Base](https://github.com/edmozley/freeitsm/wiki/Mobile-Friendly-Knowledge), [Service Status](https://github.com/edmozley/freeitsm/wiki/Mobile-Friendly-Service-Status) and the War Room are built to work properly on a phone, without changing anything on the desktop.
+## 9. Deployment and access details
 
-## Documentation
+| Item | Value |
+| --- | --- |
+| Live application | **[Add URL]** |
+| Admin URL | **[Add URL]** |
+| Test username | **[Provide securely to examiner]** |
+| Test password | **[Provide securely to examiner]** |
+| Admin username | **[Provide securely to examiner]** |
+| Admin password | **[Provide securely to examiner]** |
 
-Everything lives in the **[Documentation Wiki](https://github.com/edmozley/freeitsm/wiki)**:
+Before submitting, verify the deployed application, database connectivity, role access and examiner credentials. Keep the deployment accessible for grading.
 
-| Guide | Covers |
-|-------|--------|
-| [Installation](https://github.com/edmozley/freeitsm/wiki/Installation) | Docker and manual setup, prerequisites, configuration files |
-| [Architecture](https://github.com/edmozley/freeitsm/wiki/Architecture) | Technology stack, directory layout, shared components, database conventions |
-| [Security](https://github.com/edmozley/freeitsm/wiki/Security) | Authentication, authorisation layers, encryption, going-live checklist |
-| [REST API](https://github.com/edmozley/freeitsm/wiki/REST-API) | How the public API works, plus per-module endpoint guides |
-| [API Reference](https://github.com/edmozley/freeitsm/wiki/API-Reference) | The internal session-based endpoints behind the UI |
+## 10. Maintenance, future evolution and limitations
 
-There are also long-form **[deep-dive articles](https://freeitsm.co.uk/deep-dive/)** on the website covering individual features, and a **[release history](https://freeitsm.co.uk/updates.php)**.
+### Maintenance strategy
 
-**Technology stack:** PHP 7.4–8.4 · MySQL 8.0+ · vanilla JavaScript (no frameworks) · TinyMCE · Apache or any PHP-capable server.
+- **Corrective:** log, prioritise and fix defects found through user feedback and testing.
+- **Adaptive:** update deployment settings and integrations when hosting, organisational or API requirements change.
+- **Perfective:** refine ticket categories, dashboards, knowledge content and user experience using operational feedback.
+- **Preventive:** apply security updates, review dependencies, back up the database and regularly test restoration.
 
-## 👋 From the maintainer
+### Future evolution
 
-FreeITSM is a one-developer project — your engagement is what keeps it moving:
+- Add and test organisation-specific integrations after credentials and governance are available.
+- Expand automated regression and security testing for project-specific changes.
+- Introduce monitoring, backup verification and production performance baselines.
+- Collect end-user feedback and prioritise improvements through the technical-debt register.
 
-- ⭐ **If you use FreeITSM, please [star the repo](https://github.com/edmozley/freeitsm/stargazers)** — it's the single biggest signal that the work is landing.
-- 📬 **Feedback, ideas, bugs?** Email me directly at [ed@freeitsm.co.uk](mailto:ed@freeitsm.co.uk) — I read every message — or use [Discussions](https://github.com/edmozley/freeitsm/discussions) and [Issues](https://github.com/edmozley/freeitsm/issues).
-- 🌍 Mentioning [freeitsm.co.uk](https://freeitsm.co.uk) on Reddit, Hacker News, Spiceworks or LinkedIn genuinely helps and means a lot.
+### Limitations
 
-Contributions are welcome — the first external pull request was merged in 2026 and more are encouraged.
+This submission is intentionally restricted to the documented core workflow and timeboxed adaptation work. Features inherited from the upstream codebase are not evidence of individual development unless separately documented with commit history, design rationale and testing evidence.
 
-## License
+## 11. Third-party reuse and attribution
 
-[MIT](LICENSE) — free for commercial and personal use.
+ICCTECH is an adaptation/deployment project based on [FreeITSM](https://github.com/edmozley/freeitsm), an MIT-licensed open-source IT Service Management platform created by its original maintainer, Ed Mozley. FreeITSM and its original author retain their attribution and copyright notices.
+
+`Clemzy123` is the owner of this repository and the student developer responsible for the examination-specific scoping, configuration, deployment, validation, documentation and any separately identified changes. This README does not claim sole authorship of the upstream FreeITSM platform. All significant reused work must be disclosed and referenced in the final examination submission.
+
+## 12. References
+
+- University of Ghana, CSCD602 Advanced Software Engineering individual project examination brief, 2025/2026.
+- [FreeITSM upstream repository](https://github.com/edmozley/freeitsm).
+- [FreeITSM MIT licence](LICENSE).
+
+## Licence
+
+This repository retains the existing [MIT License](LICENSE). See the licence and upstream notices for full terms.
