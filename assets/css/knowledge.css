@@ -1,0 +1,1224 @@
+/**
+ * Knowledge Base Styles
+ */
+
+.knowledge-container {
+    display: flex;
+    height: calc(100vh - 48px);
+    background: var(--app-bg, #f5f5f5);
+    /* position: relative is the anchor for .sidebar-hover .knowledge-sidebar's
+       absolute positioning — keep it here in both modes so the layout doesn't
+       reflow when the user toggles the preference. */
+    position: relative;
+}
+
+/* Sidebar */
+.knowledge-sidebar {
+    width: 280px;
+    background: var(--surface, white);
+    border-right: 1px solid var(--border, #ddd);
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* Hover mode (Knowledge → Settings → Left panel). The sidebar collapses to a
+   thin 16px hot-zone on the left of the article list; hovering expands it to
+   its full width. Because the sidebar leaves the flex layout (position:
+   absolute), the main article list reflows to fill the freed space.
+   Pattern mirrors the Process Mapper module. */
+.knowledge-container.sidebar-hover .knowledge-sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 16px;
+    min-width: 16px;
+    z-index: 10;
+    overflow: hidden;
+    transition: width 0.18s ease;
+    box-shadow: 2px 0 8px var(--shadow, rgba(0, 0, 0, 0.12));
+    padding: 0;
+}
+.knowledge-container.sidebar-hover .knowledge-sidebar:hover {
+    width: 280px;
+    padding: 20px;
+    overflow-y: auto;
+}
+/* Fade out the sidebar's children so their left edges don't peek through the
+   16px hot-zone — without this you can see fragments of the search box and
+   tag pills and it looks unfinished. On hover the children fade back in. */
+.knowledge-container.sidebar-hover .knowledge-sidebar > * {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease 0s;
+}
+.knowledge-container.sidebar-hover .knowledge-sidebar:hover > * {
+    opacity: 1;
+    pointer-events: auto;
+    transition-delay: 0.08s;
+}
+/* Subtle vertical strip on the collapsed sidebar so users know it's hoverable. */
+.knowledge-container.sidebar-hover .knowledge-sidebar::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 6px;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 36px;
+    border-radius: 2px;
+    background: #bbb;
+    transition: opacity 0.18s;
+    pointer-events: none;
+}
+.knowledge-container.sidebar-hover .knowledge-sidebar:hover::before { opacity: 0; }
+
+.sidebar-section {
+    margin-bottom: 24px;
+}
+
+.sidebar-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text, #333);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--accent, #0078d4);
+}
+
+.tag-filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tag-filter {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--surface-hover, #f0f0f0);
+    border: 1px solid var(--border, #ddd);
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tag-filter:hover {
+    background: var(--accent-soft, #e8f4fd);
+    border-color: var(--accent, #0078d4);
+}
+
+.tag-filter.active {
+    background: var(--accent, #0078d4);
+    border-color: var(--accent, #0078d4);
+    color: var(--on-accent, white);
+}
+
+.tag-filter .tag-count {
+    margin-left: 6px;
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+/* Main content area */
+.knowledge-main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 30px;
+}
+
+/* Article list */
+.article-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.article-list-header h2 {
+    font-size: 24px;
+    color: var(--text, #333);
+}
+
+.article-count {
+    color: var(--text-muted, #666);
+    font-size: 14px;
+}
+
+.article-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.article-card {
+    background: var(--surface, white);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px var(--shadow, rgba(0,0,0,0.08));
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border, #e0e0e0);
+    position: relative;
+}
+
+/* Bulk-select tick. The whole card opens the article, so the label stops
+   propagation (see knowledge.js); the padding widens the hit area so it is
+   reachable without catching the card. */
+.article-select {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    padding: 4px;
+    cursor: pointer;
+    z-index: 1;
+}
+.article-select input { cursor: pointer; }
+
+/* Room for the tick so a long title never runs underneath it. */
+.article-card-title { padding-right: 28px; }
+
+.kb-bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    background: var(--accent-soft, #eff6ff);
+    border: 1px solid var(--border, #e0e0e0);
+}
+.kb-bulk-count { font-weight: 600; color: var(--text, #333); }
+.kb-bulk-bar label { color: var(--text-muted, #666); font-size: 13px; }
+.kb-bulk-bar select {
+    padding: 6px 10px;
+    border: 1px solid var(--border, #e0e0e0);
+    border-radius: 6px;
+    background: var(--surface, #fff);
+    color: var(--text, #333);
+    font-family: inherit;
+}
+
+.article-card:hover {
+    box-shadow: 0 8px 18px var(--shadow, rgba(0,0,0,0.14));
+    border-color: var(--accent, #0078d4);
+    transform: translateY(-3px);
+}
+
+.article-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text, #333);
+    margin-bottom: 8px;
+}
+
+.article-card-preview {
+    color: var(--text-muted, #666);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.article-card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-dim, #888);
+}
+
+.article-card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.article-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--accent-soft, #e8f4fd);
+    color: var(--accent, #0078d4);
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.article-card-info {
+    display: flex;
+    gap: 16px;
+}
+
+/* Article detail view */
+.article-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.article-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.article-content {
+    background: var(--surface, white);
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 4px var(--shadow, rgba(0,0,0,0.08));
+}
+
+.article-content-header {
+    border-bottom: 1px solid var(--border, #e0e0e0);
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+}
+
+.article-content-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text, #333);
+    margin-bottom: 12px;
+}
+
+.article-content-meta {
+    display: flex;
+    gap: 24px;
+    font-size: 14px;
+    color: var(--text-muted, #666);
+}
+
+.article-content-tags {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.article-content-body {
+    line-height: 1.7;
+    color: var(--text, #333);
+}
+
+.article-content-body h1,
+.article-content-body h2,
+.article-content-body h3 {
+    margin-top: 24px;
+    margin-bottom: 12px;
+}
+
+.article-content-body p {
+    margin-bottom: 16px;
+}
+
+.article-content-body ul,
+.article-content-body ol {
+    margin-bottom: 16px;
+    padding-left: 24px;
+}
+
+.article-content-body code {
+    background: var(--surface-2, #f5f5f5);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Consolas', monospace;
+}
+
+.article-content-body pre {
+    background: var(--surface-2, #f5f5f5);
+    padding: 16px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin-bottom: 16px;
+}
+
+/* Editor view */
+.editor-header {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.editor-header h2 {
+    font-size: 24px;
+    color: var(--text, #333);
+    margin: 0;
+}
+
+/* Popout toggle: same expand/contract icon-swap pattern as the tickets
+   subject-row .ticket-popout-toggle. */
+.editor-popout-toggle {
+    border: 1px solid var(--border, #ddd);
+    background: var(--surface, white);
+    border-radius: 4px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    cursor: pointer;
+    color: var(--text-muted, #666);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.editor-popout-toggle:hover {
+    border-color: var(--kb-accent, #8764b8);
+    color: var(--kb-accent, #8764b8);
+}
+.editor-popout-toggle .popout-icon-contract { display: none; }
+.knowledge-container.editor-popout .editor-popout-toggle .popout-icon-expand   { display: none; }
+.knowledge-container.editor-popout .editor-popout-toggle .popout-icon-contract { display: inline-block; }
+
+/* Pop-out editor: hide the search/tags sidebar so the editor fills the
+   panel, and reflow the editor form into [content | 340px property panel]
+   columns. Same CSS-only DOM-unchanged approach as the tickets popout.
+   In popout mode the editor consumes the full pane height — outer scroll
+   container becomes a flex column that fills its parent, and both panels
+   take the available height with their own internal scroll if needed. */
+.knowledge-container.editor-popout .knowledge-sidebar { display: none; }
+
+.knowledge-container.editor-popout .editor-scroll {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.knowledge-container.editor-popout .editor-header {
+    flex-shrink: 0;
+}
+.knowledge-container.editor-popout .editor-form {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: stretch;
+    gap: 24px;
+}
+/* Explains what the chosen "who can see this" actually means, under the select.
+   Themed via tokens so it doesn't glow white in dark mode. */
+.editor-properties .field-hint {
+    display: block;
+    margin-top: 5px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    font-weight: 400;
+    color: var(--text-dim, #888);
+}
+
+.knowledge-container.editor-popout .editor-properties {
+    flex-shrink: 0;
+    width: 340px;
+    background: var(--surface-2, #fafafa);
+    border: 1px solid var(--border, #e0e0e0);
+    border-radius: 6px;
+    padding: 16px;
+    overflow-y: auto;
+}
+/* Inside the property panel, stack the two-column rows vertically so
+   each field gets the full panel width. */
+.knowledge-container.editor-popout .editor-properties .form-row {
+    flex-direction: column !important;
+    gap: 16px !important;
+}
+.knowledge-container.editor-popout .editor-properties .form-row + .form-row {
+    margin-top: 16px;
+}
+
+/* In the narrow right-hand panel, the chips-next-to-label layout that
+   works in the wide regular view gets cramped. Reorder so the layout
+   becomes: [label] / [input] / [chips]. display: contents on the
+   .tag-label-row dissolves the wrapper so the label and the chips
+   become direct flex children of the form-group; then `order` rearranges
+   them around the input container. */
+.knowledge-container.editor-popout .editor-properties .tag-form-group {
+    display: flex;
+    flex-direction: column;
+}
+.knowledge-container.editor-popout .editor-properties .tag-form-group .tag-label-row {
+    display: contents;
+}
+.knowledge-container.editor-popout .editor-properties .tag-form-group > .tag-label-row > .form-label,
+.knowledge-container.editor-popout .editor-properties .tag-form-group > .form-label {
+    order: 1;
+}
+.knowledge-container.editor-popout .editor-properties .tag-form-group > .tag-input-container {
+    order: 2;
+}
+.knowledge-container.editor-popout .editor-properties .tag-form-group > .tag-label-row > .selected-tags,
+.knowledge-container.editor-popout .editor-properties .tag-form-group > .selected-tags {
+    order: 3;
+    justify-content: flex-start;
+    margin-top: 8px;
+}
+.knowledge-container.editor-popout .editor-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.knowledge-container.editor-popout .editor-content > .form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-bottom: 0;
+}
+/* Make TinyMCE fill the available editor-content height. The default
+   iframe sizing is fixed via init config (~400px); in popout we want it
+   to fill whatever height the flex column gives it. */
+.knowledge-container.editor-popout .editor-content .tox-tinymce {
+    flex: 1;
+    height: auto !important;
+    min-height: 0;
+}
+
+.editor-form {
+    background: var(--surface, white);
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 4px var(--shadow, rgba(0,0,0,0.08));
+}
+
+/* Editor view becomes a flex column so the action row can sit as a real
+   footer below an internally-scrolling content area. The scrollbar then
+   ends at the top of the footer rather than running through it. */
+.article-editor-view {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.editor-scroll {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    /* Restore the padding that .knowledge-main used to provide; we strip
+       that off below so the action row can span the pane edge-to-edge. */
+    padding: 20px 30px;
+    margin: -20px -30px 0;
+}
+
+.editor-actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    /* Symmetric padding around the buttons: equal top / bottom, and
+       a tighter right inset so the buttons sit closer to the panel edge. */
+    padding: 14px 16px;
+    background: var(--surface, white);
+    border-top: 1px solid var(--border, #e0e0e0);
+    box-shadow: 0 -2px 6px var(--shadow, rgba(0, 0, 0, 0.04));
+    /* Negative horizontal margins to extend the bar to the panel edges
+       (cancels .knowledge-main's 30px padding-x). No negative bottom
+       margin so .knowledge-main's 20px padding-bottom shows as breathing
+       room beneath the footer. */
+    margin: 0 -30px 0;
+}
+
+/* Tag input — the label and the selected chips share a single flex row
+   (chips right-aligned), and the actual text input lives on the row
+   beneath wearing the same .form-input border so the Title and Tags
+   fields line up height-for-height. */
+.tag-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+.tag-label-row .form-label {
+    margin-bottom: 0;
+}
+
+.tag-input-container {
+    position: relative;
+}
+
+.selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.selected-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    background: var(--accent, #0078d4);
+    color: var(--on-accent, white);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.selected-tag .remove-tag {
+    margin-left: 6px;
+    cursor: pointer;
+    opacity: 0.8;
+    font-weight: bold;
+}
+
+.selected-tag .remove-tag:hover {
+    opacity: 1;
+}
+
+.tag-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 4px;
+    outline: none;
+    font-size: 14px;
+}
+
+.tag-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface, white);
+    border: 1px solid var(--border, #ddd);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.tag-suggestions.active {
+    display: block;
+}
+
+.tag-suggestion {
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.tag-suggestion:hover {
+    background: var(--surface-hover, #f0f0f0);
+}
+
+.tag-suggestion.new-tag {
+    color: var(--accent, #0078d4);
+    font-style: italic;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim, #888);
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.empty-state-text {
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+/* Button variants */
+.btn-danger {
+    background: var(--danger-accent, #d13438);
+    color: var(--on-accent, white);
+}
+
+.btn-danger:hover {
+    background: #a80000;
+}
+
+/* Loading state for articles */
+.article-list .loading {
+    padding: 40px;
+    text-align: center;
+}
+
+/* No results */
+.no-results {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-dim, #888);
+    font-size: 14px;
+}
+
+/* Code sample blocks (TinyMCE codesample plugin) */
+.article-content-body pre[class*="language-"] {
+    margin: 16px 0;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.article-content-body pre[class*="language-"] code {
+    background: transparent;
+    padding: 0;
+}
+
+/* Prism toolbar styling */
+div.code-toolbar > .toolbar {
+    opacity: 1;
+}
+
+div.code-toolbar > .toolbar > .toolbar-item > button,
+div.code-toolbar > .toolbar > .toolbar-item > span {
+    background: #444;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+/* Knowledge module purple theme overrides */
+.knowledge-container .btn-primary {
+    background: var(--kb-accent, #8764b8);
+    border-color: var(--kb-accent, #8764b8);
+}
+
+.knowledge-container .btn-primary:hover {
+    background: var(--kb-accent-hover, #6b4fa2);
+    border-color: var(--kb-accent-hover, #6b4fa2);
+}
+
+.tag-filter:hover {
+    background: var(--kb-accent-soft, #f3eef8);
+    border-color: var(--kb-accent, #8764b8);
+}
+
+.tag-filter.active {
+    background: var(--kb-accent, #8764b8);
+    border-color: var(--kb-accent, #8764b8);
+    color: var(--kb-on-accent, white);
+}
+
+.knowledge-container .form-input:focus,
+.knowledge-container .tag-input:focus {
+    border-color: var(--kb-accent, #8764b8);
+    box-shadow: 0 0 0 2px rgba(135, 100, 184, 0.1);
+}
+
+/* Sticky article header */
+.article-content-header {
+    position: sticky;
+    top: 0;
+    background: var(--surface, white);
+    z-index: 10;
+    padding: 20px 0;
+    margin: -20px 0 20px 0;
+    border-bottom: 1px solid var(--border, #e0e0e0);
+}
+
+/* Share dropdown */
+.share-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.btn-share {
+    background: var(--kb-accent, #8764b8);
+    color: var(--kb-on-accent, white);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.btn-share:hover {
+    background: var(--kb-accent-hover, #6b4fa2);
+}
+
+.btn-share svg {
+    width: 16px;
+    height: 16px;
+}
+
+.share-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--surface, white);
+    border-radius: 6px;
+    box-shadow: 0 4px 20px var(--shadow, rgba(0, 0, 0, 0.15));
+    min-width: 180px;
+    z-index: 100;
+    display: none;
+    overflow: hidden;
+}
+
+.share-dropdown-menu.active {
+    display: block;
+}
+
+.share-dropdown-menu a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    color: var(--text, #333);
+    text-decoration: none;
+    font-size: 14px;
+    transition: background 0.15s;
+}
+
+.share-dropdown-menu a:hover {
+    background: var(--surface-hover, #f5f5f5);
+}
+
+.share-dropdown-menu a svg {
+    color: var(--text-muted, #666);
+    flex-shrink: 0;
+}
+
+/* Toast notification */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #333;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 1000;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+/* Share email modal styling */
+#shareEmailModal .modal-header {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text, #333);
+    margin-bottom: 20px;
+}
+
+#shareEmailModal .modal-header h3 {
+    margin: 0;
+}
+
+#shareEmailModal .form-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+#shareEmailModal .form-textarea:focus {
+    outline: none;
+    border-color: var(--kb-accent, #8764b8);
+}
+
+#shareEmailModal .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border, #e0e0e0);
+}
+
+/* AI Chat Panel */
+.ai-chat-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: none;
+}
+
+.ai-chat-overlay.active {
+    display: block;
+}
+
+.ai-chat-panel {
+    position: fixed;
+    top: 0;
+    right: -420px;
+    width: 420px;
+    height: 100vh;
+    background: var(--surface, white);
+    box-shadow: -4px 0 20px var(--shadow, rgba(0, 0, 0, 0.15));
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.3s ease;
+}
+
+.ai-chat-panel.active {
+    right: 0;
+}
+
+.ai-chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--kb-accent, #8764b8), var(--kb-accent-hover, #6b4fa2));
+    color: var(--kb-on-accent, white);
+}
+
+.ai-chat-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.ai-chat-close {
+    background: none;
+    border: none;
+    color: var(--kb-on-accent, white);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0.8;
+}
+
+.ai-chat-close:hover {
+    opacity: 1;
+}
+
+.ai-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ai-chat-welcome {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted, #666);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.ai-chat-message {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ai-chat-message.user {
+    align-items: flex-end;
+}
+
+.ai-chat-message.assistant {
+    align-items: flex-start;
+}
+
+.ai-chat-bubble {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+    word-wrap: break-word;
+}
+
+.ai-chat-message.user .ai-chat-bubble {
+    background: var(--kb-accent, #8764b8);
+    color: var(--kb-on-accent, white);
+    border-bottom-right-radius: 4px;
+}
+
+.ai-chat-message.assistant .ai-chat-bubble {
+    background: var(--surface-hover, #f0f0f0);
+    color: var(--text, #333);
+    border-bottom-left-radius: 4px;
+}
+
+.ai-chat-bubble p { margin: 0 0 8px 0; }
+.ai-chat-bubble p:last-child { margin-bottom: 0; }
+.ai-chat-bubble ul, .ai-chat-bubble ol { margin: 4px 0; padding-left: 20px; }
+.ai-chat-bubble code { background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+.ai-chat-bubble strong { font-weight: 600; }
+
+.ai-chat-meta {
+    font-size: 11px;
+    color: var(--text-faint, #999);
+    padding: 0 4px;
+}
+
+.ai-chat-thinking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--surface-hover, #f0f0f0);
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+    max-width: 85%;
+    font-size: 14px;
+    color: var(--text-dim, #888);
+}
+
+.ai-chat-thinking .dots {
+    display: flex;
+    gap: 4px;
+}
+
+.ai-chat-thinking .dots span {
+    width: 6px;
+    height: 6px;
+    background: #aaa;
+    border-radius: 50%;
+    animation: dotPulse 1.4s infinite;
+}
+
+.ai-chat-thinking .dots span:nth-child(2) { animation-delay: 0.2s; }
+.ai-chat-thinking .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+    0%, 80%, 100% { opacity: 0.3; }
+    40% { opacity: 1; }
+}
+
+.ai-chat-error {
+    padding: 10px 14px;
+    background: var(--danger-bg, #fce4ec);
+    color: var(--danger-text, #c62828);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.ai-chat-input-area {
+    display: flex;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border, #e0e0e0);
+    background: var(--surface-2, #fafafa);
+}
+
+.ai-chat-input-area textarea {
+    flex: 1;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+}
+
+.ai-chat-input-area textarea:focus {
+    border-color: var(--kb-accent, #8764b8);
+}
+
+.ai-chat-send {
+    width: 42px;
+    height: 42px;
+    border: none;
+    background: var(--kb-accent, #8764b8);
+    color: var(--kb-on-accent, white);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.ai-chat-send:hover {
+    background: var(--kb-accent-hover, #6b4fa2);
+}
+
+.ai-chat-send:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.ai-article-link {
+    color: var(--kb-accent, #7c4daf);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px dashed var(--kb-accent, #7c4daf);
+    transition: color 0.15s, border-color 0.15s;
+}
+.ai-article-link:hover {
+    color: var(--kb-accent-hover, #5a2d8c);
+    border-bottom-style: solid;
+}
+
+/* Recycle Bin Toggle */
+.recycle-bin-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.recycle-bin-toggle.active {
+    background: var(--danger-accent, #d13438);
+    border-color: var(--danger-accent, #d13438);
+    color: var(--on-accent, white);
+}
+
+.recycle-bin-toggle.active:hover {
+    background: #b02a2d;
+}
+
+/* Recycle Bin Notice */
+.recycle-bin-notice {
+    padding: 10px 16px;
+    background: var(--warning-bg, #fff3cd);
+    border: 1px solid var(--warning-border, #ffc107);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--warning-text, #856404);
+    margin-bottom: 16px;
+}
+
+/* Recycle Bin Cards */
+.recycle-bin-card {
+    border-left: 4px solid var(--danger-accent, #d13438) !important;
+    opacity: 0.85;
+    cursor: default !important;
+}
+
+.recycle-bin-card:hover {
+    opacity: 1;
+}
+
+.recycle-bin-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.btn-sm {
+    padding: 6px 14px;
+    font-size: 13px;
+}
+
+/* AI Chat Archive Toggle */
+.ai-chat-options {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border, #e0e0e0);
+    background: var(--surface-2, #fafafa);
+    font-size: 13px;
+}
+
+.ai-archive-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    color: var(--text-muted, #555);
+    user-select: none;
+}
+
+.toggle-label {
+    flex: 1;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: #ccc;
+    border-radius: 20px;
+    transition: background 0.2s;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 2px;
+    top: 2px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--kb-accent, #8764b8);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(16px);
+}
+
+/* Toast notification */
+.kb-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #333;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 10000;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.kb-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}

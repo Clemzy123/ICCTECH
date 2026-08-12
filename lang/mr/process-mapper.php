@@ -1,0 +1,131 @@
+<?php
+/**
+ * मराठी (mr) — Process Mapper module strings.
+ * Falls back per-key to lang/en/process-mapper.php for anything missing.
+ */
+return [
+    'title' => 'प्रक्रिया मॅपर',
+
+    'nav' => [
+        'processes' => 'प्रक्रिया',
+        'settings'  => 'सेटिंग्ज',
+        'help'      => 'मदत',
+    ],
+
+    'sidebar' => [
+        'new_process'        => '+ नवीन प्रक्रिया',
+        'search_placeholder' => 'प्रक्रिया शोधा…',
+        'no_processes_yet'   => 'अद्याप कोणत्या प्रक्रिया नाहीत',
+    ],
+
+    'toolbar' => [
+        'process'   => 'प्रक्रिया',
+        'decision'  => 'निर्णय',
+        'terminal'  => 'सुरुवात/शेवट',
+        'document'  => 'दस्तऐवज',
+        'connect'   => 'जोडा',
+        'group'     => 'गट',
+        'lane'      => 'लेन',
+        'export'    => 'निर्यात',
+        'save'      => 'जतन करा',
+    ],
+
+    'context' => [
+        'create_new' => 'नवीन तयार करा…',
+    ],
+
+    'shapes' => [
+        'rectangle'     => 'आयत',
+        'rounded'       => 'गोलाकार',
+        'pill'          => 'पिल',
+        'circle'        => 'वर्तुळ',
+        'diamond'       => 'समभुज चौकोन',
+        'parallelogram' => 'समांतरभुज चौकोन',
+        'trapezoid'     => 'समलंब चौकोन',
+        'hexagon'       => 'षटकोन',
+        'document'      => 'दस्तऐवज',
+        'cylinder'      => 'दंडगोल',
+        'cloud'         => 'क्लाउड',
+        'subroutine'    => 'सबरूटीन',
+    ],
+
+    'settings' => [
+        'title'            => 'पायरी प्रकार',
+        'intro'            => 'प्रक्रिया मॅपर टूलबारमध्ये उपलब्ध ब्लॉक प्रकार परिभाषित करा. प्रत्येक प्रकार एक नाव, एक आकार आणि एक रंग आहे.',
+        'add_type'         => 'प्रकार जोडा',
+        'col_order'        => 'क्रम',
+        'col_shape'        => 'आकार',
+        'col_name'         => 'नाव',
+        'col_colour'       => 'रंग',
+        'col_active'       => 'सक्रिय',
+        'col_actions'      => 'क्रिया',
+        'none'             => 'अद्याप कोणतेही पायरी प्रकार नाहीत',
+        'builtin'          => 'अंगभूत',
+        'yes'              => 'होय',
+        'no'               => 'नाही',
+        'add_title'        => 'पायरी प्रकार जोडा',
+        'edit_title'       => 'पायरी प्रकार संपादित करा',
+        'field_name'       => 'नाव',
+        'field_shape'      => 'आकार',
+        'field_colour'     => 'रंग',
+        'field_active'     => 'सक्रिय',
+        'name_placeholder' => 'उदा. डेटाबेस, मॅन्युअल पायरी',
+        'name_required'    => 'नाव आवश्यक आहे',
+        'saved'            => 'जतन केले',
+        'deleted'          => 'हटवले',
+        'delete_confirm'   => 'हा पायरी प्रकार हटवायचा?',
+    ],
+
+    'autosave' => [
+        'label'   => 'स्वयं-जतन',
+        'saved'   => 'जतन केले',
+        'unsaved' => 'जतन केलेले नाही',
+        'unsaved_changes' => 'जतन न केलेले बदल',
+        'saving'  => 'जतन करत आहे…',
+        'failed'  => 'जतन अयशस्वी —',
+        'retry'   => 'पुन्हा प्रयत्न',
+        'off'     => 'स्वयं-जतन बंद',
+        'tooltip' => 'संपादन थांबल्यानंतर काही सेकंदात आपोआप जतन होते',
+    ],
+
+    'detail' => [
+        'step_title'   => 'पायरीचे तपशील',
+        'group_title'  => 'गटाचे तपशील',
+        'lane_title'   => 'लेनचे तपशील',
+        'label'        => 'लेबल',
+        'type'         => 'प्रकार',
+        'colour'       => 'रंग',
+        'gradient'     => 'ग्रेडियंट',
+        'description'  => 'वर्णन',
+        'position'     => 'स्थान',
+        'size'         => 'आकार',
+        'height'       => 'उंची',
+        'order'        => 'क्रम (वरून खाली)',
+        'connectors'   => 'कनेक्टर',
+        'no_connectors'=> 'कनेक्टर नाहीत',
+        'step_type' => [
+            'process'  => 'प्रक्रिया',
+            'decision' => 'निर्णय',
+            'terminal' => 'सुरुवात/शेवट',
+            'document' => 'दस्तऐवज',
+        ],
+        'step_description_placeholder' => 'या पायरीबद्दल टिपा जोडा…',
+        'lane_label_placeholder'       => 'उदा. HR / IT / पुरवठादार',
+        'group_label_placeholder'      => 'उदा. निराकरण टप्पा',
+        'lane_hint'                    => 'पुनर्क्रमित करण्यासाठी लेनचा डावा शीर्षलेख ओढा. आकार बदलण्यासाठी तळाची कडा ओढा. या लेनला नियुक्त करण्यासाठी पट्ट्यात एक पायरी टाका.',
+    ],
+
+    'export_modal' => [
+        'title'  => 'निर्यात — Mermaid फ्लोचार्ट',
+        'hint'   => 'Mermaid समर्थन असलेल्या कोणत्याही Markdown संपादकात हे मार्कअप पेस्ट करा (GitHub, GitLab, Notion, Confluence, Obsidian…). लेन <code>subgraph</code> ब्लॉक बनतात; ऑटो-लेआउट तुम्ही हाताने ठेवलेल्या स्थानांची जागा घेतो.',
+        'copy'   => 'कॉपी',
+        'copied' => 'कॉपी झाले ✓',
+        'close'  => 'बंद',
+    ],
+
+    'toast' => [
+        'no_process_open' => 'प्रथम एक प्रक्रिया उघडा किंवा तयार करा',
+        'saved'           => 'जतन केले',
+        'save_failed'     => 'जतन अयशस्वी',
+    ],
+];

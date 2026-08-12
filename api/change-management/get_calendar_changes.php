@@ -1,0 +1,97 @@
+<?php
+/**
+ * API Endpoint: Get Calendar Changes
+ * Returns changes within a date range, optionally filtered by status
+ */
+session_start(['read_and_close' => true]);
+require_once '../../config.php';
+require_once '../../includes/functions.php';
+require_once '../../includes/tenancy.php';
+
+header('Content-Type: application/json');
+
+if (!isset($_SESSION['analyst_id'])) {
+    echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+    exit;
+}
+
+$startDate = $_GET['start'] ?? null;
+$endDate = $_GET['end'] ?? null;
+$statuses = isset($_GET['statuses']) ? explode(',', $_GET['statuses']) : null;
+
+if (!$startDate || !$endDate) {
+    echo json_encode(['success' => false, 'error' => 'Start and end dates are required']);
+    exit;
+}
+
+try {
+    $conn = connectToDatabase();
+
+    $sql = "SELECT c.id, c.title,
+                   ct.name AS change_type,
+                   cs.name AS status, cs.colour AS status_colour,
+                   cp.name AS priority,
+                   ci.name AS impact,
+                   c.work_start_datetime, c.work_end_datetime,
+                   c.outage_start_datetime, c.outage_end_datetime,
+                   a.full_name as assigned_to_name
+            FROM changes c
+            LEFT JOIN change_types      ct ON ct.id = c.change_type_id
+            LEFT JOIN change_statuses   cs ON cs.id = c.status_id
+            LEFT JOIN change_priorities cp ON cp.id = c.priority_id
+            LEFT JOIN change_impacts    ci ON ci.id = c.impact_id
+            LEFT JOIN analysts a ON c.assigned_to_id = a.id
+            WHERE c.work_start_datetime IS NOT NULL
+              AND (
+                (c.work_start_datetime >= ? AND c.work_start_datetime < ?)
+                OR (c.work_end_datetime > ? AND c.work_end_datetime <= ?)
+                OR (c.work_start_datetime < ? AND c.work_end_datetime > ?)
+              )";
+
+    // Company scope (active company; Default also owns NULL-tenant changes). No-op at N=1.
+    [$tenantSql, $tenantParams] = activeTenantFilter($conn, (int)$_SESSION['analyst_id'], 'c');
+    $sql .= $tenantSql;
+
+    $params = array_merge([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate], $tenantParams);
+
+    // Filter by statuses if specified
+    if ($statuses && count($statuses) > 0) {
+        $placeholders = implode(',', array_fill(0, count($statuses), '?'));
+        $sql .= " AND cs.name IN ($placeholders)";
+        $params = array_merge($params, $statuses);
+    }
+
+    $sql .= " ORDER BY c.work_start_datetime";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute($params);
+    $changes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Map to calendar-compatible structure
+    $events = [];
+    foreach ($changes as $change) {
+        $events[] = [
+            'id'                    => (int)$change['id'],
+            'title'                 => $change['title'],
+            'change_type'           => $change['change_type'],
+            'status'                => $change['status'],
+            'priority'              => $change['priority'],
+            'impact'                => $change['impact'],
+            'start_datetime'        => $change['work_start_datetime'],
+            'end_datetime'          => $change['work_end_datetime'],
+            'outage_start_datetime' => $change['outage_start_datetime'],
+            'outage_end_datetime'   => $change['outage_end_datetime'],
+            'assigned_to_name'      => $change['assigned_to_name'],
+            'status_color'          => $change['status_colour'] ?: '#9e9e9e'
+        ];
+    }
+
+    echo json_encode([
+        'success' => true,
+        'events'  => $events
+    ]);
+
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+}
+?>

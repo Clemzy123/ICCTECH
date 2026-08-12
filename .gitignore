@@ -1,0 +1,147 @@
+# FreeITSM - Git Ignore File
+# Prevents sensitive and unnecessary files from being pushed to GitHub
+
+# ============================================
+# SENSITIVE FILES - NEVER COMMIT THESE
+# ============================================
+
+# Database backups and dumps (but allow schema files)
+*.bak
+*backup*.sql
+*dump*.sql
+database/backups/
+
+# Encryption keys
+*.key
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# ============================================
+# DEVELOPMENT & IDE FILES
+# ============================================
+
+# Claude Code settings
+.claude/
+CLAUDE.local.md
+CHANGELOG.local.md
+
+# Design docs not yet ready to publish
+docs/design/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# PhpStorm / IntelliJ IDEA
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# OPERATING SYSTEM FILES
+# ============================================
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.directory
+
+# ============================================
+# PHP & COMPOSER
+# ============================================
+
+# Composer dependencies (if you add them later)
+/vendor/
+
+# PHP error logs
+error_log
+php_errors.log
+
+# ============================================
+# LOGS & TEMPORARY FILES
+# ============================================
+
+# Log files
+*.log
+logs/
+!reporting/logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+tmp/
+temp/
+
+# Upload directories (may contain sensitive user data)
+uploads/*
+!uploads/.gitkeep
+
+# Module-specific runtime content (attachments, uploaded LMS courses, etc.)
+# These are populated by the running app and are tenant-specific — never commit.
+# Ignore uploaded content, but DO ship the guard that stops these directories
+# ever executing code. Ignoring the CONTENTS (/*) rather than the directory
+# itself is what lets the negation work — git won't re-include a file whose
+# parent directory is ignored.
+#
+# ⚠️ Three of these were ignored as whole directories, so their .htaccess could
+# never have shipped. A fresh clone therefore had no execution guard until the
+# first upload created one at runtime — which is exactly the window in which a
+# new install is least likely to notice.
+change-management/attachments/*
+!change-management/attachments/.htaccess
+lms/content/*
+!lms/content/.htaccess
+tickets/attachments/*
+!tickets/attachments/.htaccess
+contracts/rfp-builder/uploads/*
+!contracts/rfp-builder/uploads/.htaccess
+system/uploads/branding/*
+!system/uploads/branding/.htaccess
+recordings/*
+!recordings/.htaccess
+war-room/attachments/*
+!war-room/attachments/.htaccess
+!war-room/attachments/web.config
+
+# ============================================
+# NODE MODULES (if you use npm/Node.js)
+# ============================================
+
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ============================================
+# BACKUP FILES
+# ============================================
+
+*.backup
+*.old
+*.orig
+
+# Credentials handed over during setup. NEVER commit these — a PAT in the
+# history is a live credential even after the file is deleted.
+.devops-pat.txt
+*-pat.txt
+*.pat
+.secrets/

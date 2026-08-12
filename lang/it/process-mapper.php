@@ -1,0 +1,131 @@
+<?php
+/**
+ * Italiano (it) — Process Mapper module strings.
+ * Falls back per-key to lang/en/process-mapper.php for anything missing.
+ */
+return [
+    'title' => 'Mappatore di processi',
+
+    'nav' => [
+        'processes' => 'Processi',
+        'settings'  => 'Impostazioni',
+        'help'      => 'Aiuto',
+    ],
+
+    'sidebar' => [
+        'new_process'        => '+ Nuovo processo',
+        'search_placeholder' => 'Cerca processi…',
+        'no_processes_yet'   => 'Nessun processo',
+    ],
+
+    'toolbar' => [
+        'process'   => 'Processo',
+        'decision'  => 'Decisione',
+        'terminal'  => 'Inizio/Fine',
+        'document'  => 'Documento',
+        'connect'   => 'Connetti',
+        'group'     => 'Gruppo',
+        'lane'      => 'Corsia',
+        'export'    => 'Esporta',
+        'save'      => 'Salva',
+    ],
+
+    'context' => [
+        'create_new' => 'Crea nuovo…',
+    ],
+
+    'shapes' => [
+        'rectangle'     => 'Rettangolo',
+        'rounded'       => 'Arrotondato',
+        'pill'          => 'Pillola',
+        'circle'        => 'Cerchio',
+        'diamond'       => 'Rombo',
+        'parallelogram' => 'Parallelogramma',
+        'trapezoid'     => 'Trapezio',
+        'hexagon'       => 'Esagono',
+        'document'      => 'Documento',
+        'cylinder'      => 'Cilindro',
+        'cloud'         => 'Nuvola',
+        'subroutine'    => 'Subroutine',
+    ],
+
+    'settings' => [
+        'title'            => 'Tipi di passo',
+        'intro'            => 'Definisci i tipi di blocco disponibili nella barra degli strumenti del Mappatore di processi. Ogni tipo è un nome, una forma e un colore.',
+        'add_type'         => 'Aggiungi tipo',
+        'col_order'        => 'Ordine',
+        'col_shape'        => 'Forma',
+        'col_name'         => 'Nome',
+        'col_colour'       => 'Colore',
+        'col_active'       => 'Attivo',
+        'col_actions'      => 'Azioni',
+        'none'             => 'Nessun tipo di passo',
+        'builtin'          => 'Integrato',
+        'yes'              => 'Sì',
+        'no'               => 'No',
+        'add_title'        => 'Aggiungi tipo di passo',
+        'edit_title'       => 'Modifica tipo di passo',
+        'field_name'       => 'Nome',
+        'field_shape'      => 'Forma',
+        'field_colour'     => 'Colore',
+        'field_active'     => 'Attivo',
+        'name_placeholder' => 'es. Database, Passo manuale',
+        'name_required'    => 'Il nome è obbligatorio',
+        'saved'            => 'Salvato',
+        'deleted'          => 'Eliminato',
+        'delete_confirm'   => 'Eliminare questo tipo di passo?',
+    ],
+
+    'autosave' => [
+        'label'   => 'Salvataggio automatico',
+        'saved'   => 'Salvato',
+        'unsaved' => 'Non salvato',
+        'unsaved_changes' => 'Modifiche non salvate',
+        'saving'  => 'Salvataggio…',
+        'failed'  => 'Salvataggio non riuscito —',
+        'retry'   => 'riprova',
+        'off'     => 'Salvataggio automatico disattivato',
+        'tooltip' => 'Salva automaticamente qualche secondo dopo aver smesso di modificare',
+    ],
+
+    'detail' => [
+        'step_title'   => 'Dettagli passo',
+        'group_title'  => 'Dettagli gruppo',
+        'lane_title'   => 'Dettagli corsia',
+        'label'        => 'Etichetta',
+        'type'         => 'Tipo',
+        'colour'       => 'Colore',
+        'gradient'     => 'Sfumatura',
+        'description'  => 'Descrizione',
+        'position'     => 'Posizione',
+        'size'         => 'Dimensione',
+        'height'       => 'Altezza',
+        'order'        => 'Ordine (dall\'alto verso il basso)',
+        'connectors'   => 'Connettori',
+        'no_connectors'=> 'Nessun connettore',
+        'step_type' => [
+            'process'  => 'Processo',
+            'decision' => 'Decisione',
+            'terminal' => 'Inizio/Fine',
+            'document' => 'Documento',
+        ],
+        'step_description_placeholder' => 'Aggiungi note su questo passo…',
+        'lane_label_placeholder'       => 'es. HR / IT / Fornitore',
+        'group_label_placeholder'      => 'es. Fase di risoluzione',
+        'lane_hint'                    => 'Trascina l\'intestazione sinistra della corsia per riordinare. Trascina il bordo inferiore per ridimensionare. Rilascia un passo nella corsia per assegnarlo a essa.',
+    ],
+
+    'export_modal' => [
+        'title'  => 'Esporta — Diagramma Mermaid',
+        'hint'   => 'Incolla questo codice in qualsiasi editor Markdown che supporti Mermaid (GitHub, GitLab, Notion, Confluence, Obsidian…). Le corsie diventano blocchi <code>subgraph</code>; il layout automatico sostituisce le posizioni impostate manualmente.',
+        'copy'   => 'Copia',
+        'copied' => 'Copiato ✓',
+        'close'  => 'Chiudi',
+    ],
+
+    'toast' => [
+        'no_process_open' => 'Apri o crea prima un processo',
+        'saved'           => 'Salvato',
+        'save_failed'     => 'Salvataggio non riuscito',
+    ],
+];

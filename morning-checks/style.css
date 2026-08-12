@@ -1,0 +1,617 @@
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--app-bg, #f5f7fa);
+    color: var(--text, #333);
+    line-height: 1.6;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    padding-bottom: 350px; /* Space for sticky footer */
+    height: calc(100vh - 48px);
+    overflow-y: auto;
+}
+
+/* Header */
+header {
+    background: var(--surface, white);
+    padding: 20px 30px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px var(--shadow, rgba(0,0,0,0.1));
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+}
+
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.logo {
+    max-height: 50px;
+    width: auto;
+}
+
+nav {
+    display: flex;
+    gap: 10px;
+}
+
+nav a {
+    padding: 8px 20px;
+    text-decoration: none;
+    color: var(--text-muted, #5a6c7d);
+    border-radius: 5px;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+nav a:hover {
+    background-color: var(--surface-hover, #f0f2f5);
+    color: var(--text, #2c3e50);
+}
+
+nav a.active {
+    background-color: var(--accent, #007bff);
+    color: white;
+}
+
+/* Date Display */
+.date-display {
+    background: var(--surface, white);
+    padding: 20px 30px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px var(--shadow, rgba(0,0,0,0.1));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.date-display h2 {
+    font-size: 18px;
+    color: var(--text, #2c3e50);
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.date-selector-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.date-selector-container label {
+    font-weight: 600;
+    color: var(--text, #2c3e50);
+    white-space: nowrap;
+}
+
+.date-selector-container input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid var(--border, #ced4da);
+    border-radius: 5px;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.date-selector-container input[type="date"]:focus {
+    outline: none;
+    border-color: var(--accent, #007bff);
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.btn-today {
+    padding: 8px 16px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.btn-today:hover {
+    background-color: #218838;
+}
+
+.btn-pdf {
+    padding: 8px 16px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.btn-pdf:hover {
+    background-color: #c82333;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    background: var(--surface, white);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px var(--shadow, rgba(0,0,0,0.1));
+}
+
+thead {
+    background-color: var(--surface-2, #f8f9fa);
+}
+
+th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text, #2c3e50);
+    border-bottom: 2px solid var(--border, #e9ecef);
+}
+
+td {
+    padding: 15px;
+    border-bottom: 1px solid var(--border, #e9ecef);
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tr:hover {
+    background-color: var(--surface-hover, #f8f9fa);
+}
+
+.loading, .error, .no-data {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted, #6c757d);
+}
+
+.error {
+    color: var(--danger-accent, #dc3545);
+}
+
+/* Status Buttons */
+.status-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.status-btn {
+    padding: 8px 16px;
+    border: 2px solid;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+    background: var(--surface, white);
+}
+
+.status-btn.green {
+    border-color: #28a745;
+    color: #28a745;
+}
+
+.status-btn.green:hover {
+    background-color: #28a745;
+    color: white;
+}
+
+.status-btn.green.active {
+    background-color: #28a745;
+    color: white;
+}
+
+.status-btn.amber {
+    border-color: #ffc107;
+    color: #d39e00;
+}
+
+.status-btn.amber:hover {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.status-btn.amber.active {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.status-btn.red {
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.status-btn.red:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+.status-btn.red.active {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* Row Status Colors */
+tr.status-green {
+    background-color: #f0fff4;
+}
+
+tr.status-amber {
+    background-color: #fff9e6;
+}
+
+tr.status-red {
+    background-color: #fff0f0;
+}
+
+[data-theme-mode="dark"] tr.status-green { background-color: #14261a; }
+[data-theme-mode="dark"] tr.status-amber { background-color: #2a2410; }
+[data-theme-mode="dark"] tr.status-red   { background-color: #2a1416; }
+
+/* Notes Display */
+.notes-display {
+    font-size: 14px;
+    color: var(--text-muted, #6c757d);
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+/* Buttons — .btn-primary / .btn-secondary come from inbox.css now.
+   .save-btn is a legacy alias still referenced in some places; keep it
+   as a primary-style button to match the rest of the app. */
+.save-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    font-size: 14px;
+    background-color: var(--accent, #0078d4);
+    color: white;
+}
+.save-btn:hover { background-color: var(--accent-hover, #005a9e); }
+
+.btn-edit, .btn-delete {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.3s;
+    margin-right: 5px;
+}
+
+.btn-edit {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.btn-edit:hover {
+    background-color: #117a8b;
+}
+
+.btn-delete {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-delete:hover {
+    background-color: #c82333;
+}
+
+/* Chart Footer - Sticky */
+.chart-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface, white);
+    border-top: 3px solid var(--accent, #007bff);
+    box-shadow: 0 -2px 10px var(--shadow, rgba(0,0,0,0.1));
+    z-index: 100;
+}
+
+.chart-footer-header {
+    padding: 15px 30px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface-2, #f8f9fa);
+    border-bottom: 1px solid var(--border, #e9ecef);
+}
+
+.chart-footer-header:hover {
+    background: var(--surface-hover, #e9ecef);
+}
+
+.chart-footer-header h2 {
+    font-size: 18px;
+    color: var(--text, #2c3e50);
+    margin: 0;
+}
+
+.toggle-icon {
+    font-size: 18px;
+    color: var(--accent, #007bff);
+    font-weight: bold;
+}
+
+.chart-container-inner {
+    padding: 20px 30px 30px 30px;
+    height: 280px;
+}
+
+#chartContainer canvas {
+    max-height: 100%;
+}
+
+/* Checks Section */
+.checks-section {
+    margin-bottom: 30px;
+}
+
+/* Manage Checks Page */
+.manage-section {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 30px;
+}
+
+@media (max-width: 1200px) {
+    .manage-section {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* .add-check-form / .checks-list white-card styling removed — the
+   settings page now nests these inside the canonical .tab-content
+   which already provides the white-card surface. Leaving the styling
+   here was double-card-nesting. .add-check-form is unreferenced
+   anywhere in markup; .checks-list lives inside .tab-content. */
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text, #2c3e50);
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border, #ced4da);
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent, #007bff);
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.form-group input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+/* Badges */
+.badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-active {
+    background-color: var(--success-bg, #d4edda);
+    color: var(--success-text, #155724);
+}
+
+.badge-inactive {
+    background-color: var(--danger-bg, #f8d7da);
+    color: var(--danger-text, #721c24);
+}
+
+/* Actions Column */
+.actions {
+    white-space: nowrap;
+}
+
+/* Raise Ticket button (amber/red rows) */
+.raise-ticket-btn {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #00838f;
+    background: #e0f7fa;
+    border: 1px solid #b2ebf2;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.raise-ticket-btn:hover {
+    background: #b2ebf2;
+    border-color: #80deea;
+}
+[data-theme-mode="dark"] .raise-ticket-btn {
+    color: var(--mc-accent);
+    background: var(--mc-accent-soft);
+    border-color: var(--mc-accent-hover);
+}
+
+/* Form fields and base .modal styling come from inbox.css now —
+   only the per-page modal-content sizing + the h2-as-header
+   styling remain here (this module's modals use a plain <h2>
+   inside .modal-content rather than the canonical .modal-header). */
+
+.modal-content {
+    padding: 20px;
+    max-width: 600px;
+}
+
+.modal-content h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text, #333);
+    margin: 0 0 10px;
+}
+
+.modal-content p {
+    color: var(--text-muted, #6c757d);
+    margin: 0 0 20px;
+    font-size: 14px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    body {
+        padding-bottom: 320px;
+    }
+
+    .container {
+        padding: 10px;
+    }
+
+    header {
+        padding: 15px;
+    }
+
+    .header-left {
+        gap: 10px;
+    }
+
+    .logo {
+        max-height: 40px;
+    }
+
+    nav {
+        flex-wrap: wrap;
+    }
+
+    nav a {
+        font-size: 13px;
+        padding: 6px 12px;
+    }
+
+    .date-display {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+        padding: 15px;
+    }
+
+    .date-display h2 {
+        font-size: 16px;
+    }
+
+    .date-selector-container {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .date-selector-container input[type="date"] {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .btn-today,
+    .btn-pdf {
+        flex-shrink: 0;
+    }
+
+    table {
+        font-size: 13px;
+    }
+
+    th, td {
+        padding: 8px;
+    }
+
+    .status-buttons {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .status-btn {
+        width: 100%;
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+
+    .chart-container-inner {
+        height: 250px;
+        padding: 15px;
+    }
+
+    .chart-footer-header {
+        padding: 12px 15px;
+    }
+
+    .chart-footer-header h2 {
+        font-size: 16px;
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 20px;
+    }
+
+    .notes-display {
+        font-size: 13px;
+        max-width: 200px;
+    }
+}

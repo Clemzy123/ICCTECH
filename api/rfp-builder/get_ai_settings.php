@@ -1,0 +1,59 @@
+<?php
+/**
+ * Return the RFP Builder AI settings (provider, model, masked api key).
+ * The api key is decrypted then masked before sending — plaintext never
+ * leaves the server.
+ */
+session_start(['read_and_close' => true]);
+require_once '../../config.php';
+require_once '../../includes/functions.php';
+require_once '../../includes/rbac.php';
+require_once '../../includes/encryption.php';
+
+header('Content-Type: application/json');
+
+if (!isset($_SESSION['analyst_id'])) {
+    echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+    exit;
+}
+
+// The RFP Builder is part of the Contracts module — its PAGES have always checked
+// this, its endpoints never did. Any logged-in analyst could read, edit or delete
+// any RFP by calling the API directly. (Found by debug tool D005.)
+requireModuleAccessJson('contracts');
+requireCapabilityJson(Cap::CONTRACTS_RFP_AI);   // Contracts settings tab — see docs/design/rbac.md
+const RFP_AI_KEYS = ['rfp_ai_provider', 'rfp_ai_api_key', 'rfp_ai_model', 'rfp_ai_verify_ssl', 'rfp_default_style_guide'];
+
+try {
+    $conn = connectToDatabase();
+
+    $placeholders = implode(',', array_fill(0, count(RFP_AI_KEYS), '?'));
+    $stmt = $conn->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ($placeholders)");
+    $stmt->execute(RFP_AI_KEYS);
+
+    $values = [
+        'rfp_ai_provider'         => '',
+        'rfp_ai_api_key'          => '',
+        'rfp_ai_model'            => '',
+        'rfp_ai_verify_ssl'       => '',
+        'rfp_default_style_guide' => '',
+    ];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $value = $row['setting_value'];
+        if (isEncryptedSettingKey($row['setting_key'])) {
+            $value = decryptValue($value);
+        }
+        if (isMaskedSettingKey($row['setting_key'])) {
+            $value = maskSecret($value);
+        }
+        $values[$row['setting_key']] = $value;
+    }
+
+    echo json_encode([
+        'success'  => true,
+        'settings' => $values,
+        'has_key'  => $values['rfp_ai_api_key'] !== '',
+    ]);
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+}

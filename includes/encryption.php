@@ -1,0 +1,261 @@
+<?php
+/**
+ * AES-256-GCM Encryption Helper
+ *
+ * Provides encrypt/decrypt functions for sensitive database values.
+ * The key file is stored outside the web root. Its location is resolved (in
+ * order of precedence): a define('ENCRYPTION_KEY_PATH', ...) in config.php, then
+ * the ENCRYPTION_KEY_PATH environment variable (used by Docker), then an
+ * OS-specific default.
+ *
+ * Encrypted values are stored as: ENC: followed by base64(iv + tag + ciphertext)
+ * The ENC: prefix allows gradual migration - unencrypted values pass through unchanged.
+ */
+
+// Key path precedence: config.php constant (if the admin set one) wins; else the
+// ENCRYPTION_KEY_PATH env var (Docker); else the OS-specific default. The guard
+// lets config.php pre-define the constant without a "constant already defined"
+// notice — and leaves Docker's env-var behaviour untouched (its config doesn't
+// define the constant, so the env var still applies).
+if (!defined('ENCRYPTION_KEY_PATH')) {
+    $_encKeyPath = getenv('ENCRYPTION_KEY_PATH');
+    if ($_encKeyPath === false || $_encKeyPath === '') {
+        $_encKeyPath = PHP_OS_FAMILY === 'Windows'
+            ? 'c:\\wamp64\\encryption_keys\\sdtickets.key'
+            : '/var/www/encryption_keys/freeitsm.key';
+    }
+    define('ENCRYPTION_KEY_PATH', $_encKeyPath);
+}
+define('ENCRYPTION_CIPHER', 'aes-256-gcm');
+define('ENCRYPTION_IV_LENGTH', 12);   // 96-bit nonce (recommended for GCM)
+define('ENCRYPTION_TAG_LENGTH', 16);  // 128-bit auth tag
+define('ENCRYPTION_PREFIX', 'ENC:');
+
+/**
+ * System settings keys that should be encrypted at rest.
+ * Add new sensitive keys here as encryption is rolled out.
+ */
+define('ENCRYPTED_SETTING_KEYS', [
+    'vcenter_server',
+    'vcenter_user',
+    'vcenter_password',
+    'knowledge_ai_api_key',
+    'knowledge_openai_api_key',
+    'intune_tenant_id',
+    'intune_client_id',
+    'intune_client_secret',
+    'rfp_ai_api_key',
+    'tickets_reply_cleanup_api_key',
+    'cmdb_ai_api_key',
+    'workflow_ai_api_key',
+    'forms_ai_api_key',
+    // problem_ai shipped without being listed here, so its key was being stored
+    // in the clear. decryptValue() passes an unencrypted value straight through,
+    // so adding it now is safe: the existing value still reads, and re-encrypts
+    // the next time it is saved.
+    'problem_ai_api_key',
+    'lms_ai_api_key',
+    'knowledge_writeup_api_key',
+    'warroom_ai_api_key',
+]);
+
+/**
+ * system_settings keys whose values must NEVER be returned in plaintext to
+ * the client. The get endpoint replaces these with a "****<last4>" mask;
+ * the save endpoint treats incoming values that are empty or start with
+ * asterisks as "no change" so the existing encrypted value is preserved.
+ *
+ * Tenant IDs / client IDs are encrypted at rest but NOT masked — they're
+ * shown in form fields for editing. Only true secrets belong here.
+ */
+define('MASKED_SETTING_KEYS', [
+    'vcenter_password',
+    'knowledge_ai_api_key',
+    'knowledge_openai_api_key',
+    'intune_client_secret',
+    'rfp_ai_api_key',
+    'tickets_reply_cleanup_api_key',
+    'cmdb_ai_api_key',
+    'workflow_ai_api_key',
+    'forms_ai_api_key',
+    'problem_ai_api_key',
+    'lms_ai_api_key',
+    'knowledge_writeup_api_key',
+    'warroom_ai_api_key',
+]);
+
+/**
+ * Check if a system_settings key should be masked when returned to the client.
+ */
+function isMaskedSettingKey($key) {
+    return in_array($key, MASKED_SETTING_KEYS, true);
+}
+
+/**
+ * Produce a "****<last4>" mask. Empty input returns ''.
+ */
+function maskSecret($value) {
+    if ($value === null || $value === '') return '';
+    $tail = strlen($value) >= 4 ? substr($value, -4) : '';
+    return '****' . $tail;
+}
+
+/**
+ * Treat a save-time value as "leave existing untouched" when it's empty,
+ * null, or starts with one or more asterisks (i.e. the user submitted the
+ * masked placeholder unchanged).
+ */
+function isMaskedNoChangeValue($value) {
+    if ($value === null || $value === '') return true;
+    return (bool)preg_match('/^\*+/', $value);
+}
+
+/**
+ * target_mailboxes columns that should be encrypted at rest.
+ */
+define('ENCRYPTED_MAILBOX_COLUMNS', [
+    'azure_tenant_id',
+    'azure_client_id',
+    'azure_client_secret',
+    'oauth_redirect_uri',
+    'imap_server',
+    'target_mailbox',
+    // Basic IMAP / SMTP mailboxes (username + password auth).
+    'imap_username',
+    'imap_password',
+    'smtp_server',
+]);
+
+/**
+ * Check if a system_settings key should be encrypted
+ */
+function isEncryptedSettingKey($key) {
+    return in_array($key, ENCRYPTED_SETTING_KEYS, true);
+}
+
+/**
+ * Load the encryption key from the key file
+ */
+function getEncryptionKey() {
+    static $key = null;
+    if ($key === null) {
+        if (!file_exists(ENCRYPTION_KEY_PATH)) {
+            throw new Exception('Encryption key file not found at ' . ENCRYPTION_KEY_PATH);
+        }
+        $hex = trim(file_get_contents(ENCRYPTION_KEY_PATH));
+        $key = hex2bin($hex);
+        if ($key === false || strlen($key) !== 32) {
+            throw new Exception('Invalid encryption key - must be 64 hex characters (256 bits)');
+        }
+    }
+    return $key;
+}
+
+/**
+ * Encrypt a plaintext value using AES-256-GCM
+ *
+ * @param string|null $plaintext The value to encrypt
+ * @return string|null Encrypted string with ENC: prefix, or null/empty if input is null/empty
+ */
+function encryptValue($plaintext) {
+    if ($plaintext === null || $plaintext === '') {
+        return $plaintext;
+    }
+
+    // Don't double-encrypt
+    if (strpos($plaintext, ENCRYPTION_PREFIX) === 0) {
+        return $plaintext;
+    }
+
+    $key = getEncryptionKey();
+    $iv = random_bytes(ENCRYPTION_IV_LENGTH);
+    $tag = '';
+
+    $ciphertext = openssl_encrypt(
+        $plaintext,
+        ENCRYPTION_CIPHER,
+        $key,
+        OPENSSL_RAW_DATA,
+        $iv,
+        $tag,
+        '',
+        ENCRYPTION_TAG_LENGTH
+    );
+
+    if ($ciphertext === false) {
+        throw new Exception('Encryption failed: ' . openssl_error_string());
+    }
+
+    // Pack as: IV (12 bytes) + Tag (16 bytes) + Ciphertext
+    return ENCRYPTION_PREFIX . base64_encode($iv . $tag . $ciphertext);
+}
+
+/**
+ * Decrypt an encrypted value
+ *
+ * If the value doesn't have the ENC: prefix, it's returned as-is.
+ * This allows gradual migration from plaintext to encrypted values.
+ *
+ * @param string|null $encrypted The encrypted value (with ENC: prefix)
+ * @return string|null Decrypted plaintext, or the original value if not encrypted
+ */
+function decryptValue($encrypted) {
+    if ($encrypted === null || $encrypted === '') {
+        return $encrypted;
+    }
+
+    // Not encrypted - return as-is (supports migration)
+    if (strpos($encrypted, ENCRYPTION_PREFIX) !== 0) {
+        return $encrypted;
+    }
+
+    $key = getEncryptionKey();
+    $data = base64_decode(substr($encrypted, strlen(ENCRYPTION_PREFIX)));
+
+    if ($data === false) {
+        throw new Exception('Invalid encrypted data - base64 decode failed');
+    }
+
+    $minLength = ENCRYPTION_IV_LENGTH + ENCRYPTION_TAG_LENGTH;
+    if (strlen($data) < $minLength) {
+        throw new Exception('Invalid encrypted data - too short');
+    }
+
+    $iv = substr($data, 0, ENCRYPTION_IV_LENGTH);
+    $tag = substr($data, ENCRYPTION_IV_LENGTH, ENCRYPTION_TAG_LENGTH);
+    $ciphertext = substr($data, $minLength);
+
+    $plaintext = openssl_decrypt(
+        $ciphertext,
+        ENCRYPTION_CIPHER,
+        $key,
+        OPENSSL_RAW_DATA,
+        $iv,
+        $tag
+    );
+
+    if ($plaintext === false) {
+        throw new Exception('Decryption failed - data may be corrupted or wrong key');
+    }
+
+    return $plaintext;
+}
+
+/**
+ * Decrypt all encrypted columns in a target_mailboxes row.
+ *
+ * @param array|null $row A single row from the target_mailboxes table
+ * @return array|null The row with encrypted columns decrypted
+ */
+function decryptMailboxRow($row) {
+    if (!$row) {
+        return $row;
+    }
+    foreach (ENCRYPTED_MAILBOX_COLUMNS as $col) {
+        if (isset($row[$col])) {
+            $row[$col] = decryptValue($row[$col]);
+        }
+    }
+    return $row;
+}
+?>

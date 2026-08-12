@@ -1,0 +1,1709 @@
+<?php
+/**
+ * Network Mapper — Diagram editor (chunk B).
+ *
+ * Renders the editor shell and hands off to assets/js/network-mapper.js for
+ * data loading, autosave, save-as-new-version, and (in later chunks) the
+ * drag/bind/connector logic. The PHP side here is intentionally thin — most
+ * of the live behaviour lives client-side.
+ */
+session_start();
+require_once '../config.php';
+require_once '../includes/functions.php';
+require_once '../includes/i18n.php';
+require_once '../includes/theme.php';
+require_once '../includes/timezone.php';
+I18n::initFromSession();
+Tz::init();
+
+if (!isset($_SESSION['analyst_id'])) {
+    header('Location: ../login.php');
+    exit;
+}
+
+requireModuleAccess('network-mapper');
+
+$diagramId = (int)($_GET['id'] ?? 0);
+if ($diagramId <= 0) {
+    header('Location: index.php');
+    exit;
+}
+
+$current_page = 'diagrams';
+$path_prefix = '../';
+$translationNamespaces = ['common', 'network-mapper'];
+?>
+<!DOCTYPE html>
+<html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
+<head>
+    <link rel="icon" type="image/svg+xml" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>favicon.svg">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo htmlspecialchars(t('network-mapper.editor.browser_title')); ?></title>
+    <link rel="stylesheet" href="../assets/css/theme.css?v=23">
+    <link rel="stylesheet" href="../assets/css/inbox.css">
+    <style>
+        /* Pin --accent to the module cyan so shared components (focus rings,
+           inbox.css modal primitives) read on-brand. The diagram canvas + nodes
+           deliberately stay a light worksheet — only the editor CHROME themes. */
+        body { --accent: var(--nm-accent, #06b6d4); background: var(--app-bg, #f5f5f5); height: 100vh; overflow: hidden; }
+
+        .nm-editor {
+            height: calc(100vh - 60px);
+            display: flex;
+            flex-direction: column;
+            background: var(--app-bg, #f5f5f5);
+        }
+
+        /* ---- Top bar ---- */
+        .nm-editor-bar {
+            padding: 12px 20px;
+            background: var(--surface, #fff);
+            border-bottom: 1px solid var(--border, #e5e7eb);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            gap: 16px;
+        }
+        .nm-editor-title-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            flex: 1;
+        }
+        .nm-back-btn {
+            background: transparent;
+            border: 1px solid var(--border, #e5e7eb);
+            color: var(--text-dim, #6b7280);
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            flex-shrink: 0;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+        }
+        .nm-back-btn:hover { background: var(--surface-hover, #f9fafb); color: var(--text, #111827); }
+        .nm-editor-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text, #111827);
+            margin: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .nm-version-pill {
+            display: inline-block;
+            background: var(--nm-accent-soft, #ecfeff);
+            color: #0e7490;
+            border: 1px solid #a5f3fc;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .nm-version-pill.readonly { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+
+        .nm-editor-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        /* ---- Autosave toggle ---- */
+        .nm-autosave-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 8px;
+            border-right: 1px solid var(--border, #e5e7eb);
+            border-left: 1px solid var(--border, #e5e7eb);
+            height: 32px;
+        }
+        .nm-autosave-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-muted, #4b5563);
+            user-select: none;
+        }
+        .nm-autosave-toggle input { display: none; }
+        .nm-autosave-switch {
+            position: relative;
+            display: inline-block;
+            width: 26px;
+            height: 14px;
+            background: var(--border, #d1d5db);
+            border-radius: 999px;
+            transition: background 0.15s;
+        }
+        .nm-autosave-switch::after {
+            content: '';
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            width: 12px;
+            height: 12px;
+            background: #fff;   /* knob stays white in both modes */
+            border-radius: 50%;
+            transition: left 0.15s;
+        }
+        .nm-autosave-toggle input:checked + .nm-autosave-switch { background: var(--nm-accent, #06b6d4); }
+        .nm-autosave-toggle input:checked + .nm-autosave-switch::after { left: 13px; }
+
+        /* ---- Status indicator ---- */
+        .nm-status {
+            font-size: 12px;
+            color: var(--text-dim, #6b7280);
+            min-width: 120px;
+            text-align: right;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+        .nm-status-unsaved { color: #b45309; }
+        .nm-status-saving  { color: #0e7490; }
+        .nm-status-saved   { color: #166534; }
+        .nm-status-failed  { color: #b91c1c; }
+        .nm-status-off     { color: var(--text-faint, #9ca3af); font-style: italic; }
+        .nm-status-tick    { color: #16a34a; font-weight: 600; }
+        .nm-status-warn    { color: #dc2626; font-weight: 600; }
+        .nm-status-failed a { color: #b91c1c; text-decoration: underline; cursor: pointer; }
+        .nm-status-spinner {
+            width: 10px;
+            height: 10px;
+            border: 2px solid #a5f3fc;
+            border-top-color: var(--nm-accent, #06b6d4);
+            border-radius: 50%;
+            display: inline-block;
+            animation: nm-spin 0.7s linear infinite;
+        }
+        @keyframes nm-spin { to { transform: rotate(360deg); } }
+
+        /* ---- Buttons ---- */
+        .nm-btn {
+            padding: 7px 14px;
+            background: var(--nm-accent, #06b6d4);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .nm-btn:hover { background: var(--nm-accent-hover, #0891b2); }
+        .nm-btn.secondary { background: var(--surface, #fff); color: var(--text-muted, #374151); border: 1px solid var(--border, #d1d5db); }
+        .nm-btn.secondary:hover { background: var(--surface-hover, #f9fafb); }
+        .nm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ---- Zoom controls: 4 narrow buttons grouped as a single segmented unit ---- */
+        .nm-zoom-group {
+            display: inline-flex;
+            align-items: stretch;
+            gap: 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .nm-zoom-group .nm-btn {
+            border-radius: 0;
+            border-right-width: 0;
+            padding: 7px 10px;
+            font-size: 13px;
+        }
+        .nm-zoom-group .nm-btn:first-child { border-radius: 4px 0 0 4px; }
+        .nm-zoom-group .nm-btn:last-child  { border-radius: 0 4px 4px 0; border-right-width: 1px; }
+        .nm-zoom-btn  { min-width: 30px; font-weight: 600; }
+        .nm-zoom-label {
+            min-width: 56px;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-muted, #374151);
+            font-weight: 500;
+        }
+        .nm-zoom-fit { font-size: 12px; }
+
+        /* Export buttons — same segmented look as zoom, two buttons (PNG/PDF) */
+        .nm-export-group {
+            display: inline-flex;
+            align-items: stretch;
+            gap: 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .nm-export-group .nm-btn {
+            border-radius: 0;
+            border-right-width: 0;
+            padding: 7px 10px;
+            font-size: 12px;
+        }
+        .nm-export-group .nm-btn:first-child { border-radius: 4px 0 0 4px; }
+        .nm-export-group .nm-btn:last-child  { border-radius: 0 4px 4px 0; border-right-width: 1px; }
+        .nm-export-btn { min-width: 40px; font-weight: 600; }
+
+        /* ---- Meta row ---- */
+        .nm-meta-row {
+            font-size: 12px;
+            color: var(--text-dim, #6b7280);
+            padding: 8px 20px;
+            background: var(--surface-2, #fafbfc);
+            border-bottom: 1px solid var(--border, #e5e7eb);
+            display: flex;
+            gap: 18px;
+        }
+        .nm-meta-row strong { color: var(--text-muted, #374151); font-weight: 500; }
+
+        /* ---- Read-only banner ---- */
+        .nm-readonly-banner {
+            padding: 10px 20px;
+            background: #fff7ed;
+            border-bottom: 1px solid #fed7aa;
+            color: #9a3412;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .nm-readonly-banner strong { color: #7c2d12; }
+        .nm-readonly-banner a { color: #c2410c; text-decoration: underline; }
+
+        /* ---- Main canvas area ---- */
+        .nm-canvas-wrap {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ---- Palette ---- */
+        .nm-palette {
+            width: 240px;
+            background: var(--surface, #fff);
+            border-right: 1px solid var(--border, #e5e7eb);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .nm-palette-header {
+            padding: 11px 14px;
+            border-bottom: 1px solid var(--border, #e5e7eb);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted, #374151);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nm-palette-hint {
+            font-size: 11px;
+            color: var(--text-faint, #9ca3af);
+            font-weight: 400;
+        }
+        .nm-palette-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            align-content: start;
+        }
+        .nm-palette-empty {
+            grid-column: 1 / -1;
+            color: var(--text-faint, #9ca3af);
+            font-size: 13px;
+            line-height: 1.5;
+            padding: 14px 8px;
+        }
+        .nm-palette-empty a { color: var(--nm-accent, #06b6d4); }
+        .nm-palette-tile {
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 6px;
+            padding: 10px 6px 8px 6px;
+            cursor: grab;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+            user-select: none;
+            background: var(--surface, #fff);
+        }
+        .nm-palette-tile:hover {
+            border-color: var(--nm-accent, #06b6d4);
+            background: var(--nm-accent-soft, #ecfeff);
+            box-shadow: 0 2px 6px rgba(6,182,212,0.10);
+        }
+        .nm-palette-tile:active { cursor: grabbing; }
+        .nm-palette-tile-icon {
+            color: #0e7490;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 32px;
+        }
+        .nm-palette-tile-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text, #111827);
+            text-align: center;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+        .nm-palette-tile-count {
+            font-size: 10px;
+            color: var(--text-faint, #9ca3af);
+        }
+
+        /* ---- Canvas ---- */
+        .nm-canvas {
+            flex: 1;
+            position: relative;
+            background:
+                radial-gradient(circle, #d1d5db 1px, transparent 1px) 0 0 / 20px 20px,
+                #fafbfc;
+            overflow: auto;
+        }
+        /* Holds all the zoomable content. Transform applied here (not on
+           .nm-canvas) so the dot-grid background stays at 1× and scrolling
+           still works against .nm-canvas's overflow:auto. transform-origin
+           top-left so node coordinates (which are always stored in 1×
+           pixels) map cleanly into the scaled visual at the same x/y. */
+        .nm-canvas-inner {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform-origin: 0 0;
+            transform: scale(1);
+        }
+        /* Hidden footprint that grows with zoom — see comment on the spacer
+           element. width/height managed by JS in applyZoom(). */
+        .nm-canvas-spacer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3000px;
+            height: 3000px;
+            pointer-events: none;
+        }
+        .nm-canvas-empty {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #9ca3af;
+            font-size: 14px;
+            max-width: 380px;
+            line-height: 1.5;
+        }
+        .nm-canvas-empty h3 { color: #6b7280; font-weight: 600; margin: 0 0 6px 0; }
+
+        /* ---- Placed nodes ---- */
+        .nm-node {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: grab;
+            user-select: none;
+            padding: 6px;
+            border-radius: 8px;
+            border: 1.5px solid transparent;
+            background: rgba(255, 255, 255, 0.85);
+            transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+            z-index: 2;
+        }
+        .nm-node:hover {
+            background: white;
+            border-color: #a5f3fc;
+        }
+        .nm-node:active { cursor: grabbing; }
+        .nm-node.selected {
+            border-color: #06b6d4;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.18), 0 4px 12px rgba(6,182,212,0.18);
+            z-index: 3;
+        }
+        .nm-node-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0e7490;
+        }
+        .nm-node-label {
+            margin-top: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #1f2937;
+            text-align: center;
+            line-height: 1.2;
+            /* Wider than the icon so multi-word names like "Production Database"
+               sit on one line. overflow-wrap (not word-break: break-word) means
+               whole words stay intact — "FREEITSM" stays whole rather than
+               splitting mid-character to "FREEIT / SM". Single tokens that
+               genuinely don't fit fall back to breaking; the 2-line clamp +
+               ellipsis catches anything still too long. Hover tooltip shows
+               the full name regardless. */
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            line-clamp: 2;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow-wrap: break-word;
+            hyphens: auto;
+        }
+        /* Planned-node styling — dashed border + amber tint, matching the CMDB browse/detail treatment */
+        .nm-node.is-planned {
+            background: #fffbeb;
+            border-style: dashed;
+            border-color: #fcd34d;
+        }
+        .nm-node.is-planned .nm-node-icon { color: #92400e; }
+        .nm-node.is-planned .nm-node-label { font-style: italic; color: #78350f; }
+        .nm-node.is-planned.selected {
+            border-style: solid;
+            border-color: #06b6d4;
+        }
+        .nm-node-planned-pill {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+            padding: 1px 6px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        /* ---- Connector layer ---- */
+        .nm-svg-layer {
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;       /* paths re-enable on themselves */
+            z-index: 1;                 /* under nodes (z:2) and selected nodes (z:3) */
+            overflow: visible;
+        }
+        .nm-connector-line {
+            fill: none;
+            stroke: #64748b;
+            stroke-width: 2;
+            pointer-events: none;       /* the .nm-connector-hit underneath catches clicks */
+        }
+        .nm-connector-line.selected {
+            stroke: #06b6d4;
+            stroke-width: 2.5;
+        }
+        .nm-connector-line.dashed {
+            stroke-dasharray: 6 4;
+        }
+        .nm-connector-hit {
+            fill: none;
+            stroke: transparent;
+            stroke-width: 14;
+            pointer-events: stroke;
+            cursor: pointer;
+        }
+        .nm-temp-connector {
+            fill: none;
+            stroke: #06b6d4;
+            stroke-width: 2;
+            stroke-dasharray: 6 4;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+        /* Page-size guide (anchored at canvas origin, scaled to paper size) */
+        .nm-page-outline-fill {
+            fill: white;
+            opacity: 0.55;          /* lets the dot-grid bleed through, distinguishes page from off-page */
+            pointer-events: none;
+        }
+        .nm-page-outline-border {
+            fill: none;
+            stroke: #06b6d4;
+            stroke-width: 1.5;
+            stroke-dasharray: 8 5;
+            opacity: 0.75;
+            pointer-events: none;
+        }
+        .nm-page-outline-label {
+            fill: #0e7490;
+            font-size: 11px;
+            font-family: inherit;
+            font-weight: 600;
+            text-transform: capitalize;
+            opacity: 0.85;
+            pointer-events: none;
+            user-select: none;
+        }
+        /* Header/footer branding overlay — absolute-positioned inside .nm-canvas
+           so it aligns with the page outline at SVG coords 0..dims.w. HTML
+           (not SVG) so the {{logo}} token can render as an <img>. */
+        .nm-brand-header, .nm-brand-footer {
+            position: absolute;
+            left: 0;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            pointer-events: none;
+            z-index: 1;
+            color: #334155;
+            font-size: 12px;
+            box-sizing: border-box;
+            gap: 12px;
+        }
+        .nm-brand-slot {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .nm-brand-slot.left   { text-align: left; }
+        .nm-brand-slot.center { text-align: center; }
+        .nm-brand-slot.right  { text-align: right; }
+        .nm-brand-logo {
+            max-height: 28px;
+            max-width: 140px;
+            vertical-align: middle;
+        }
+        /* Branding settings modal — 6 slot inputs in a 3-column header/footer grid */
+        .nm-brand-grid {
+            display: grid;
+            grid-template-columns: 70px 1fr 1fr 1fr;
+            gap: 8px 10px;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .nm-brand-grid .row-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted, #475569);
+            text-align: right;
+            padding-right: 4px;
+        }
+        .nm-brand-grid .col-head {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-faint, #94a3b8);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+        .nm-brand-grid input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border, #d1d5db);
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        .nm-brand-grid input:focus {
+            outline: none;
+            border-color: var(--nm-accent, #06b6d4);
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.12);
+        }
+        .nm-brand-tokens {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-top: 14px;
+            font-size: 11px;
+            color: #075985;
+            line-height: 1.7;
+        }
+        .nm-brand-tokens code {
+            background: #ffffff;
+            border: 1px solid #bae6fd;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-size: 10px;
+            color: var(--nm-accent-hover, #0891b2);
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        .nm-connector-label-bg {
+            fill: white;
+            stroke: #e5e7eb;
+            stroke-width: 1;
+            cursor: pointer;
+        }
+        .nm-connector-label {
+            fill: #1f2937;
+            font-size: 11px;
+            font-family: inherit;
+            text-anchor: middle;
+            user-select: none;
+            cursor: pointer;
+        }
+        .nm-connector-label-input {
+            position: absolute;
+            z-index: 10;
+            width: 160px;
+            height: 28px;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-family: inherit;
+            color: #1f2937;
+            background: white;
+            border: 1.5px solid #06b6d4;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(6,182,212,0.25);
+            outline: none;
+            box-sizing: border-box;
+        }
+        .nm-connector-label-input::placeholder { color: #9ca3af; font-style: italic; font-size: 11px; }
+
+        /* ---- Edge handles (start a connector drag) ---- */
+        .nm-edge-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #06b6d4;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            cursor: crosshair;
+            opacity: 0;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.12s, transform 0.12s;
+            z-index: 5;
+            pointer-events: auto;
+        }
+        .nm-node:hover .nm-edge-handle,
+        .nm-node.selected .nm-edge-handle { opacity: 1; }
+        .nm-edge-handle:hover { transform: translate(-50%, -50%) scale(1.3); background: var(--nm-accent-hover, #0891b2); }
+
+        /* ---- Versions dropdown (anchored to the Versions button in the toolbar) ---- */
+        .nm-versions-wrap { position: relative; }
+        .nm-versions-dropdown {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 320px;
+            max-width: 400px;
+            max-height: 380px;
+            overflow-y: auto;
+            background: var(--surface, #fff);
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            z-index: 100;
+        }
+        .nm-vd-loading,
+        .nm-vd-empty {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-faint, #9ca3af);
+            font-size: 13px;
+        }
+        .nm-vd-row {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-soft, #f3f4f6);
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            transition: background 0.12s;
+        }
+        .nm-vd-row:last-child { border-bottom: 0; }
+        .nm-vd-row:hover { background: var(--nm-accent-soft, #ecfeff); }
+        .nm-vd-row.active { background: var(--nm-accent-soft, #ecfeff); }
+        .nm-vd-row-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .nm-vd-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text, #111827);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+        }
+        .nm-vd-row-meta {
+            font-size: 11px;
+            color: var(--text-dim, #6b7280);
+        }
+        .nm-vd-pill {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+        .nm-vd-pill.current  { background: var(--nm-accent-soft, #ecfeff); color: #0e7490; border: 1px solid #a5f3fc; }
+        .nm-vd-pill.readonly { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+        .nm-vd-pill.viewing  { background: var(--nm-accent, #06b6d4); color: white; }
+
+        /* ---- Node detail panel (slides in beside canvas when a node is selected) ---- */
+        .nm-detail-panel {
+            width: 0;
+            background: var(--surface, #fff);
+            border-left: 1px solid var(--border, #e5e7eb);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow: hidden;
+            transition: width 0.18s ease;
+        }
+        .nm-detail-panel.open { width: 320px; }
+        .nm-detail-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border, #e5e7eb);
+            background: var(--surface-2, #fafbfc);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .nm-detail-title-area {
+            display: flex;
+            gap: 10px;
+            min-width: 0;
+            flex: 1;
+            align-items: center;
+        }
+        .nm-detail-icon {
+            color: #0e7490;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .nm-detail-title-text { min-width: 0; }
+        .nm-detail-title-text h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text, #111827);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .nm-detail-subtitle {
+            font-size: 11px;
+            color: var(--text-dim, #6b7280);
+            margin-top: 2px;
+        }
+        .nm-detail-close {
+            background: transparent;
+            border: 0;
+            color: var(--text-faint, #9ca3af);
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        .nm-detail-close:hover { color: var(--text, #111827); }
+        .nm-detail-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 16px;
+        }
+        .nm-detail-section { margin-bottom: 14px; }
+        .nm-detail-field {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-soft, #f3f4f6);
+            font-size: 13px;
+        }
+        .nm-detail-field:last-child { border-bottom: 0; }
+        .nm-detail-label { color: var(--text-dim, #6b7280); flex-shrink: 0; }
+        .nm-detail-value { color: var(--text, #111827); text-align: right; word-break: break-word; }
+        .nm-detail-value a { color: #0e7490; text-decoration: none; }
+        .nm-detail-value a:hover { text-decoration: underline; }
+        .nm-detail-planned-pill {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+            padding: 1px 6px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        .nm-detail-footer {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border, #e5e7eb);
+            background: var(--surface-2, #fafbfc);
+            flex-shrink: 0;
+        }
+        .nm-detail-footer .nm-btn { width: 100%; padding: 9px 14px; }
+
+        /* ---- Properties sub-section (CMDB property values for the bound object) ---- */
+        .nm-detail-section-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim, #6b7280);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 0 0 8px 0;
+            border-bottom: 1px solid var(--border-soft, #f3f4f6);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+        .nm-detail-section-sub {
+            font-size: 10px;
+            color: var(--text-faint, #9ca3af);
+            font-weight: 500;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .nm-prop-loading,
+        .nm-prop-empty {
+            padding: 8px 0;
+            color: var(--text-faint, #9ca3af);
+            font-size: 12px;
+            font-style: italic;
+        }
+        .nm-prop-row {
+            padding: 7px 0;
+            border-bottom: 1px solid var(--border-soft, #f3f4f6);
+        }
+        .nm-prop-row:last-child { border-bottom: 0; }
+        .nm-prop-label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-dim, #6b7280);
+            margin-bottom: 3px;
+        }
+        .nm-prop-value {
+            display: block;
+            font-size: 13px;
+            color: var(--text, #111827);
+            line-height: 1.45;
+            word-break: break-word;
+        }
+        .nm-prop-value.bool-yes { color: #166534; font-weight: 500; }
+        .nm-prop-value.bool-no  { color: var(--text-dim, #6b7280); }
+        .nm-prop-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 500;
+            background: #f3f4f6;
+            color: var(--text-muted, #374151);
+            border: 1px solid var(--border, #e5e7eb);
+            max-width: 100%;
+            word-break: break-word;
+        }
+        .nm-prop-ref {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #fce7f3;
+            color: #9d174d;
+            border: 1px solid #fbcfe8;
+            text-decoration: none;
+            max-width: 100%;
+        }
+        .nm-prop-ref:hover { background: #fbcfe8; }
+        .nm-prop-ref-class {
+            font-size: 10px;
+            color: #be185d;
+            opacity: 0.8;
+        }
+
+        /* ---- Detail panel: icon row + icon picker triggers ---- */
+        .nm-detail-icon-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nm-detail-icon-preview {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px; height: 28px;
+            color: #0e7490;
+            background: var(--nm-accent-soft, #ecfeff);
+            border-radius: 6px;
+            border: 1px solid #a5f3fc;
+            flex-shrink: 0;
+        }
+        .nm-detail-icon-btn {
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #0e7490;
+            background: var(--surface, #fff);
+            border: 1px solid #a5f3fc;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.12s;
+        }
+        .nm-detail-icon-btn:hover { background: var(--nm-accent-soft, #ecfeff); }
+        .nm-detail-icon-reset {
+            color: var(--text-dim, #6b7280);
+            border-color: #e5e7eb;
+        }
+        .nm-detail-icon-reset:hover { background: var(--surface-hover, #f9fafb); color: var(--text, #111827); }
+
+        /* ---- Icon picker modal ---- */
+        .nm-ip-search-wrap { margin-bottom: 12px; }
+        .nm-ip-search {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--border, #d1d5db);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .nm-ip-search:focus {
+            outline: none;
+            border-color: var(--nm-accent, #06b6d4);
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.12);
+        }
+        .nm-ip-grid {
+            max-height: 440px;
+            overflow-y: auto;
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 4px;
+            background: var(--surface-2, #fafbfc);
+            padding: 4px;
+        }
+        .nm-ip-category {
+            padding: 8px 8px 4px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim, #6b7280);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+        .nm-ip-category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+            gap: 6px;
+            padding: 0 4px 12px 4px;
+        }
+        .nm-ip-tile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 4px 6px 4px;
+            background: var(--surface, #fff);
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+        }
+        .nm-ip-tile:hover {
+            border-color: var(--nm-accent, #06b6d4);
+            background: var(--nm-accent-soft, #ecfeff);
+            box-shadow: 0 2px 6px rgba(6,182,212,0.12);
+        }
+        .nm-ip-tile.selected {
+            border-color: var(--nm-accent, #06b6d4);
+            background: var(--nm-accent-soft, #ecfeff);
+            box-shadow: 0 0 0 2px rgba(6,182,212,0.25);
+        }
+        .nm-ip-tile-icon {
+            color: #0e7490;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 28px;
+        }
+        .nm-ip-tile-name {
+            font-size: 10.5px;
+            font-weight: 500;
+            color: var(--text, #1f2937);
+            text-align: center;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+        .nm-ip-empty {
+            padding: 28px 16px;
+            text-align: center;
+            color: var(--text-faint, #9ca3af);
+            font-size: 13px;
+        }
+
+        /* ---- Related-objects modal ---- */
+        .nm-modal.nm-modal-wide { width: 560px; }
+        .nm-rm-intro {
+            font-size: 13px;
+            color: var(--text-dim, #6b7280);
+            margin: 0 0 14px 0;
+            line-height: 1.5;
+        }
+        .nm-rm-results {
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 4px;
+            background: var(--surface-2, #fafbfc);
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .nm-rm-loading,
+        .nm-rm-empty {
+            padding: 28px 16px;
+            text-align: center;
+            color: var(--text-faint, #9ca3af);
+            font-size: 13px;
+        }
+        .nm-rm-group {
+            background: var(--surface, #fff);
+        }
+        .nm-rm-group + .nm-rm-group { border-top: 1px solid var(--border, #e5e7eb); }
+        .nm-rm-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 14px;
+            background: var(--surface-hover, #f9fafb);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim, #6b7280);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            border-bottom: 1px solid var(--border-soft, #f3f4f6);
+        }
+        .nm-rm-group-count { color: var(--text-faint, #9ca3af); font-weight: 500; }
+        .nm-rm-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 14px;
+            border-bottom: 1px solid var(--border-soft, #f3f4f6);
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .nm-rm-row:last-child { border-bottom: 0; }
+        .nm-rm-row:hover { background: var(--nm-accent-soft, #ecfeff); }
+        .nm-rm-row.disabled { opacity: 0.55; cursor: not-allowed; background: var(--surface-2, #fafbfc); }
+        .nm-rm-row.disabled:hover { background: var(--surface-2, #fafbfc); }
+        .nm-rm-checkbox {
+            margin: 0;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--nm-accent, #06b6d4);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .nm-rm-icon {
+            color: #0e7490;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 22px;
+        }
+        .nm-rm-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+        .nm-rm-name {
+            font-weight: 500;
+            color: var(--text, #1f2937);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+        }
+        .nm-rm-name-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .nm-rm-class {
+            font-size: 11px;
+            color: var(--text-dim, #6b7280);
+        }
+        .nm-rm-link-text {
+            font-size: 11px;
+            color: #0e7490;
+            font-style: italic;
+        }
+        .nm-rm-onboard {
+            font-size: 10px;
+            color: var(--text-dim, #6b7280);
+            background: #e5e7eb;
+            padding: 1px 6px;
+            border-radius: 999px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .nm-rm-planned-pill {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+            padding: 1px 6px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        /* ---- Object picker modal ---- */
+        .nm-picker-search-wrap { margin-bottom: 12px; }
+        .nm-picker-search {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--border, #d1d5db);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .nm-picker-search:focus {
+            outline: none;
+            border-color: var(--nm-accent, #06b6d4);
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.12);
+        }
+        .nm-picker-results {
+            max-height: 320px;
+            overflow-y: auto;
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 4px;
+            background: var(--surface-2, #fafbfc);
+        }
+        .nm-picker-row {
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--border-soft, #f3f4f6);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--text, #1f2937);
+            background: var(--surface, #fff);
+        }
+        .nm-picker-row:last-child { border-bottom: 0; }
+        .nm-picker-row:hover,
+        .nm-picker-row.highlighted {
+            background: var(--nm-accent-soft, #ecfeff);
+            color: #0e7490;
+        }
+        .nm-picker-name {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nm-picker-parent {
+            font-size: 11px;
+            color: var(--text-faint, #9ca3af);
+        }
+        .nm-picker-planned {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+            padding: 1px 6px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .nm-picker-empty {
+            padding: 28px 16px;
+            text-align: center;
+            color: var(--text-faint, #9ca3af);
+            font-size: 13px;
+            background: var(--surface, #fff);
+        }
+        .nm-picker-empty a { color: var(--nm-accent, #06b6d4); }
+
+        /* ---- Modal (Save as new version) ---- */
+        .nm-modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .nm-modal-overlay.active { display: flex; }
+        .nm-modal {
+            background: var(--surface, #fff);
+            border-radius: 8px;
+            width: 480px;
+            max-width: 95vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .nm-modal-header {
+            padding: 16px 22px;
+            border-bottom: 1px solid var(--border, #e5e7eb);
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--text, #111827);
+        }
+        .nm-modal-body { padding: 22px; flex: 1; overflow-y: auto; }
+        .nm-modal-actions {
+            padding: 14px 22px;
+            border-top: 1px solid var(--border, #e5e7eb);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .nm-form-group { margin-bottom: 14px; }
+        .nm-form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted, #374151);
+            margin-bottom: 5px;
+        }
+        .nm-form-group input, .nm-form-group textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--border, #d1d5db);
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        .nm-form-group textarea { resize: vertical; min-height: 70px; }
+        .nm-form-group input:focus, .nm-form-group textarea:focus {
+            outline: none;
+            border-color: var(--nm-accent, #06b6d4);
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.12);
+        }
+        .nm-form-group small { color: #6b7280; font-size: 12px; display: block; margin-top: 4px; }
+
+        /* ---- Present mode: hide all chrome and show only the diagram.
+           Toggled by adding .is-presenting to .nm-editor. The canvas itself
+           stays visible and takes the full editor area. F11 is left to the
+           browser/user for a true fullscreen escalation. ---- */
+        .nm-present-exit {
+            position: fixed;
+            top: 14px;
+            right: 14px;
+            z-index: 2000;
+            display: none;             /* shown only in present mode */
+            padding: 8px 14px;
+            background: rgba(15, 23, 42, 0.85);
+            color: white;
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+        .nm-present-exit:hover { background: rgba(15, 23, 42, 1); }
+        .nm-editor.is-presenting .nm-editor-bar,
+        .nm-editor.is-presenting .nm-meta-row,
+        .nm-editor.is-presenting .nm-readonly-banner,
+        .nm-editor.is-presenting .nm-palette,
+        .nm-editor.is-presenting .nm-detail-panel { display: none !important; }
+        .nm-editor.is-presenting .nm-present-exit { display: block; }
+        /* Canvas-wrap fills the editor; the dot-grid background that normally
+           sits behind the diagram is replaced with plain white so the
+           presented view looks like a finished document, not a workspace. */
+        .nm-editor.is-presenting .nm-canvas-wrap { padding: 0; }
+        .nm-editor.is-presenting .nm-canvas {
+            background: white !important;
+            /* Present mode tight-fits the diagram to the viewport so the
+               canvas-spacer's scrollable footprint is no longer useful —
+               hiding overflow drops the scrollbars cleanly. */
+            overflow: hidden !important;
+        }
+        /* .nm-editor's normal height = 100vh - 60px to leave room for the
+           module nav bar. With the bar hidden in Present mode we reclaim
+           that 60px so there's no empty strip at the bottom. */
+        body.nm-presenting .nm-editor { height: 100vh !important; }
+        /* Module nav bar lives outside .nm-editor so we target it via the
+           body class toggled in enterPresent()/exitPresent(). */
+        body.nm-presenting .header { display: none !important; }
+
+        /* ---- Export capture mode: applied to .nm-canvas-inner during a
+           PNG/PDF snapshot so the rasterised image doesn't pick up
+           edit-time chrome (selection rings, edge handles, the empty-state
+           placeholder). ---- */
+        .nm-canvas-inner.is-exporting .nm-node-edge-handle,
+        .nm-canvas-inner.is-exporting .nm-canvas-empty { display: none !important; }
+        .nm-canvas-inner.is-exporting .nm-node.selected {
+            border-color: transparent !important;
+            box-shadow: none !important;
+        }
+        .nm-canvas-inner.is-exporting .nm-connector-line.selected {
+            stroke: #64748b !important;
+            stroke-width: 2 !important;
+        }
+        /* Use the cyan default arrowhead in non-selected form too */
+        .nm-canvas-inner.is-exporting .nm-connector-line { marker-end: url(#nm-arrow) !important; }
+
+        /* ---- Dark-mode overrides for chrome amber/sky tints ----
+           The read-only amber banners/pills and the sky-blue "tokens" info box
+           in the branding modal keep their light values above (so light mode is
+           unchanged) and flip to dark tints here so they don't glow. The diagram
+           canvas, nodes and connectors are intentionally NOT overridden — they
+           stay a light worksheet in both modes (and in PNG/PDF exports). */
+        [data-theme-mode="dark"] .nm-version-pill.readonly,
+        [data-theme-mode="dark"] .nm-vd-pill.readonly { background: #3a2e12; color: #fcd34d; border-color: #5a4a1e; }
+        [data-theme-mode="dark"] .nm-readonly-banner { background: #3a2e12; border-bottom-color: #5a4a1e; color: #fcd34d; }
+        [data-theme-mode="dark"] .nm-readonly-banner strong { color: #fde68a; }
+        [data-theme-mode="dark"] .nm-readonly-banner a { color: #fdba74; }
+        [data-theme-mode="dark"] .nm-brand-tokens { background: #12263a; border-color: #1e3a52; color: #7dd3fc; }
+        [data-theme-mode="dark"] .nm-brand-tokens code { background: #0b1220; border-color: #1e3a52; }
+    </style>
+</head>
+<body>
+    <?php include 'includes/header.php'; ?>
+
+    <div class="nm-editor">
+        <div class="nm-editor-bar">
+            <div class="nm-editor-title-area">
+                <a class="nm-back-btn" href="index.php"><?php echo htmlspecialchars(t('network-mapper.editor.back')); ?></a>
+                <h1 class="nm-editor-title" id="diagramTitle"><?php echo htmlspecialchars(t('network-mapper.editor.loading')); ?></h1>
+                <span class="nm-version-pill" id="versionPill" style="display:none;"></span>
+            </div>
+            <div class="nm-editor-actions">
+                <div class="nm-autosave-wrap" id="autosaveWrap">
+                    <label class="nm-autosave-toggle" title="<?php echo htmlspecialchars(t('network-mapper.editor.autosave_title')); ?>">
+                        <input type="checkbox" id="nmAutosaveToggle" onchange="NM.toggleAutosave(this.checked)">
+                        <span class="nm-autosave-switch"></span>
+                        <span><?php echo htmlspecialchars(t('network-mapper.editor.autosave')); ?></span>
+                    </label>
+                </div>
+                <span class="nm-status" id="saveStatus"></span>
+                <div class="nm-versions-wrap">
+                    <button class="nm-btn secondary" id="pageBtn" onclick="NM.togglePageDropdown(event)" title="<?php echo htmlspecialchars(t('network-mapper.editor.page_btn_title')); ?>">
+                        <span id="pageBtnLabel"><?php echo htmlspecialchars(t('network-mapper.editor.page_off')); ?></span>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left: 4px; vertical-align: -1px;"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="nm-versions-dropdown" id="pageDropdown" style="display:none;"></div>
+                </div>
+                <div class="nm-zoom-group" role="group" aria-label="Zoom">
+                    <button class="nm-btn secondary nm-zoom-btn" id="zoomOutBtn" onclick="NM.zoomOut()" title="<?php echo htmlspecialchars(t('network-mapper.editor.zoom_out')); ?>">&minus;</button>
+                    <button class="nm-btn secondary nm-zoom-label" id="zoomLabel" onclick="NM.zoomReset()" title="<?php echo htmlspecialchars(t('network-mapper.editor.zoom_reset_title')); ?>">100%</button>
+                    <button class="nm-btn secondary nm-zoom-btn" id="zoomInBtn" onclick="NM.zoomIn()" title="<?php echo htmlspecialchars(t('network-mapper.editor.zoom_in')); ?>">+</button>
+                    <button class="nm-btn secondary nm-zoom-fit" id="zoomFitBtn" onclick="NM.zoomFit()" title="<?php echo htmlspecialchars(t('network-mapper.editor.zoom_fit_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.zoom_fit')); ?></button>
+                </div>
+                <button class="nm-btn secondary" id="brandingBtn" onclick="NM.openBrandingModal()" title="<?php echo htmlspecialchars(t('network-mapper.editor.branding_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.branding')); ?></button>
+                <button class="nm-btn secondary" id="centreBtn" onclick="NM.centre()" title="<?php echo htmlspecialchars(t('network-mapper.editor.centre_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.centre')); ?></button>
+                <div class="nm-export-group" role="group" aria-label="Export">
+                    <button class="nm-btn secondary nm-export-btn" id="exportPngBtn" onclick="NM.exportPng()" title="<?php echo htmlspecialchars(t('network-mapper.editor.export_png_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.export_png')); ?></button>
+                    <button class="nm-btn secondary nm-export-btn" id="exportPdfBtn" onclick="NM.exportPdf()" title="<?php echo htmlspecialchars(t('network-mapper.editor.export_pdf_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.export_pdf')); ?></button>
+                </div>
+                <button class="nm-btn secondary" id="presentBtn" onclick="NM.enterPresent()" title="<?php echo htmlspecialchars(t('network-mapper.editor.present_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.present')); ?></button>
+                <div class="nm-versions-wrap">
+                    <button class="nm-btn secondary" id="versionsBtn" onclick="NM.toggleVersionsDropdown(event)" title="<?php echo htmlspecialchars(t('network-mapper.editor.versions_title')); ?>">
+                        <?php echo htmlspecialchars(t('network-mapper.editor.versions')); ?>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left: 4px; vertical-align: -1px;"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="nm-versions-dropdown" id="versionsDropdown" style="display:none;"></div>
+                </div>
+                <button class="nm-btn secondary" id="saveVersionBtn" onclick="NM.openNewVersionModal()" title="<?php echo htmlspecialchars(t('network-mapper.editor.save_version_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.save_version')); ?></button>
+                <button class="nm-btn" id="saveBtn" onclick="NM.save()" title="<?php echo htmlspecialchars(t('network-mapper.editor.save_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.save')); ?></button>
+            </div>
+        </div>
+
+        <div class="nm-meta-row" id="metaRow" style="display:none;">
+            <span><strong><?php echo htmlspecialchars(t('network-mapper.editor.meta_author')); ?></strong> <span id="metaAuthor">&mdash;</span></span>
+            <span><strong><?php echo htmlspecialchars(t('network-mapper.editor.meta_created')); ?></strong> <span id="metaCreated">&mdash;</span></span>
+            <span><strong><?php echo htmlspecialchars(t('network-mapper.editor.meta_updated')); ?></strong> <span id="metaUpdated">&mdash;</span></span>
+        </div>
+
+        <div class="nm-readonly-banner" id="readonlyBanner" style="display:none;">
+            <span><strong><?php echo htmlspecialchars(t('network-mapper.editor.readonly_banner')); ?></strong><?php echo htmlspecialchars(t('network-mapper.editor.readonly_banner_rest')); ?></span>
+            <a href="index.php"><?php echo htmlspecialchars(t('network-mapper.editor.readonly_back')); ?></a>
+        </div>
+
+        <div class="nm-canvas-wrap">
+            <aside class="nm-palette">
+                <div class="nm-palette-header">
+                    <span><?php echo htmlspecialchars(t('network-mapper.editor.palette_title')); ?></span>
+                    <span class="nm-palette-hint"><?php echo htmlspecialchars(t('network-mapper.editor.palette_hint')); ?></span>
+                </div>
+                <div class="nm-palette-body" id="paletteBody">
+                    <div class="nm-palette-empty"><?php echo htmlspecialchars(t('network-mapper.editor.palette_loading')); ?></div>
+                </div>
+            </aside>
+            <div class="nm-canvas" id="canvas">
+                <!-- Invisible spacer that drives the scrollable area when zoomed:
+                     CSS `transform` doesn't affect layout, so without this the
+                     canvas would only scroll over the unscaled content extent and
+                     clip whatever zoom-in pushed off-screen. JS sets its size to
+                     (BASE * zoom) on every zoom change. -->
+                <div class="nm-canvas-spacer" id="canvasSpacer"></div>
+                <!-- All zoomable content (nodes, SVG layer, brand strips, inline
+                     label editor) is appended to .nm-canvas-inner so the
+                     transform: scale() on it doesn't also scale the dot-grid
+                     background painted by .nm-canvas itself. -->
+                <div class="nm-canvas-inner" id="canvasInner">
+                    <div class="nm-canvas-empty" id="canvasEmpty">
+                        <h3><?php echo htmlspecialchars(t('network-mapper.editor.canvas_empty_heading')); ?></h3>
+                        <p><?php echo htmlspecialchars(t('network-mapper.editor.canvas_empty_body')); ?></p>
+                    </div>
+                </div>
+            </div>
+            <!-- Floating Exit pill in Present mode (hidden until .nm-editor.is-presenting) -->
+            <button class="nm-present-exit" id="presentExitBtn" onclick="NM.exitPresent()" title="<?php echo htmlspecialchars(t('network-mapper.editor.present_exit_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.editor.present_exit')); ?></button>
+            <!-- Detail panel (slides in when a node is selected). Sits beside
+                 the canvas inside the same wrap so it shrinks the canvas
+                 rather than overlaying it — a chunk-D-only addition. -->
+            <aside class="nm-detail-panel" id="nodeDetailPanel" aria-hidden="true">
+                <div class="nm-detail-header">
+                    <div class="nm-detail-title-area">
+                        <div class="nm-detail-icon" id="ndIcon"></div>
+                        <div class="nm-detail-title-text">
+                            <h3 id="ndName"><?php echo htmlspecialchars(t('network-mapper.detail.node')); ?></h3>
+                            <div class="nm-detail-subtitle" id="ndClass">&mdash;</div>
+                        </div>
+                    </div>
+                    <button class="nm-detail-close" onclick="NM.closeDetail()" title="<?php echo htmlspecialchars(t('common.close')); ?>">&times;</button>
+                </div>
+                <div class="nm-detail-body">
+                    <div class="nm-detail-section">
+                        <div class="nm-detail-field"><span class="nm-detail-label"><?php echo htmlspecialchars(t('network-mapper.detail.class')); ?></span><span class="nm-detail-value" id="ndClassValue">&mdash;</span></div>
+                        <div class="nm-detail-field" id="ndPlannedRow" style="display:none;"><span class="nm-detail-label"><?php echo htmlspecialchars(t('network-mapper.detail.status')); ?></span><span class="nm-detail-value"><span class="nm-detail-planned-pill"><?php echo htmlspecialchars(t('network-mapper.detail.planned_pill')); ?></span> <?php echo htmlspecialchars(t('network-mapper.detail.planned_future')); ?></span></div>
+                        <div class="nm-detail-field"><span class="nm-detail-label"><?php echo htmlspecialchars(t('network-mapper.detail.cmdb')); ?></span><span class="nm-detail-value"><a id="ndCmdbLink" href="#" target="_blank"><?php echo htmlspecialchars(t('network-mapper.detail.cmdb_open')); ?></a></span></div>
+                        <div class="nm-detail-field">
+                            <span class="nm-detail-label"><?php echo htmlspecialchars(t('network-mapper.detail.icon')); ?></span>
+                            <span class="nm-detail-value nm-detail-icon-row">
+                                <span class="nm-detail-icon-preview" id="ndIconPreview"></span>
+                                <button class="nm-detail-icon-btn" id="ndIconChangeBtn" onclick="NM.openIconPicker()" title="<?php echo htmlspecialchars(t('network-mapper.detail.icon_change_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.detail.icon_change')); ?></button>
+                                <button class="nm-detail-icon-btn nm-detail-icon-reset" id="ndIconResetBtn" onclick="NM.resetIconOverride()" title="<?php echo htmlspecialchars(t('network-mapper.detail.icon_reset_title')); ?>" style="display:none;"><?php echo htmlspecialchars(t('network-mapper.detail.icon_reset')); ?></button>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="nm-detail-section" id="ndPropertiesSection" style="display:none;">
+                        <div class="nm-detail-section-header"><?php echo htmlspecialchars(t('network-mapper.detail.properties')); ?> <span class="nm-detail-section-sub"><?php echo htmlspecialchars(t('network-mapper.detail.properties_from')); ?></span></div>
+                        <div id="ndProperties"></div>
+                    </div>
+                </div>
+                <!-- Sticky footer: stays pinned at the bottom of the panel so the
+                     primary action is always reachable no matter how many CMDB
+                     properties scroll above. Sits outside .nm-detail-body so
+                     the body's overflow-y: auto only scrolls the content. -->
+                <div class="nm-detail-footer">
+                    <button class="nm-btn" id="ndAddRelatedBtn" onclick="NM.openRelatedModal()"><?php echo htmlspecialchars(t('network-mapper.detail.add_related')); ?></button>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- CMDB object picker (opened on drop) -->
+    <div class="nm-modal-overlay" id="objectPickerModal">
+        <div class="nm-modal">
+            <div class="nm-modal-header">
+                <?php echo htmlspecialchars(t('network-mapper.picker.title_prefix')); ?><span id="pickerClassLabel"><?php echo htmlspecialchars(t('network-mapper.picker.title_default')); ?></span><?php echo htmlspecialchars(t('network-mapper.picker.title_suffix')); ?>
+            </div>
+            <div class="nm-modal-body">
+                <div class="nm-picker-search-wrap">
+                    <input type="text" class="nm-picker-search" id="pickerSearch" placeholder="<?php echo htmlspecialchars(t('network-mapper.picker.search_ph')); ?>" oninput="NM.onPickerSearchInput(this.value)" onkeydown="NM.onPickerKeyDown(event)">
+                </div>
+                <div class="nm-picker-results" id="pickerResults"></div>
+            </div>
+            <div class="nm-modal-actions">
+                <button class="nm-btn secondary" onclick="NM.closeObjectPicker()"><?php echo htmlspecialchars(t('common.cancel')); ?></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-node icon picker modal (opened from the detail panel) -->
+    <div class="nm-modal-overlay" id="iconPickerModal">
+        <div class="nm-modal nm-modal-wide">
+            <div class="nm-modal-header">
+                <?php echo htmlspecialchars(t('network-mapper.iconpicker.title', ['name' => ''])); ?><span id="ipNodeName">&hellip;</span>
+            </div>
+            <div class="nm-modal-body">
+                <div class="nm-ip-search-wrap">
+                    <input type="text" class="nm-ip-search" id="ipSearch" placeholder="<?php echo htmlspecialchars(t('network-mapper.iconpicker.search_ph')); ?>" oninput="NM.onIconSearchInput(this.value)">
+                </div>
+                <div class="nm-ip-grid" id="ipGrid"></div>
+            </div>
+            <div class="nm-modal-actions">
+                <button class="nm-btn secondary" onclick="NM.closeIconPicker()"><?php echo htmlspecialchars(t('common.cancel')); ?></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add-related-objects modal (opened from the node detail panel) -->
+    <div class="nm-modal-overlay" id="relatedObjectsModal">
+        <div class="nm-modal nm-modal-wide">
+            <div class="nm-modal-header">
+                <?php echo htmlspecialchars(t('network-mapper.related.title', ['name' => ''])); ?><span id="rmSourceName">&hellip;</span>
+            </div>
+            <div class="nm-modal-body">
+                <p class="nm-rm-intro">
+                    <?php echo htmlspecialchars(t('network-mapper.related.intro')); ?>
+                </p>
+                <div class="nm-rm-results" id="rmResults">
+                    <div class="nm-rm-loading"><?php echo htmlspecialchars(t('network-mapper.related.loading')); ?></div>
+                </div>
+            </div>
+            <div class="nm-modal-actions">
+                <button class="nm-btn secondary" onclick="NM.closeRelatedModal()"><?php echo htmlspecialchars(t('common.cancel')); ?></button>
+                <button class="nm-btn" id="rmAddBtn" onclick="NM.commitRelatedSelections()" disabled><?php echo htmlspecialchars(t('network-mapper.related.add')); ?></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save as new version modal -->
+    <div class="nm-modal-overlay" id="brandingModal">
+        <div class="nm-modal nm-modal-wide">
+            <div class="nm-modal-header"><?php echo htmlspecialchars(t('network-mapper.branding.title')); ?></div>
+            <div class="nm-modal-body">
+                <p style="font-size:13px;color:#6b7280;margin:0 0 12px 0;line-height:1.5;">
+                    <?php echo t('network-mapper.branding.intro'); ?>
+                </p>
+                <div class="nm-brand-grid">
+                    <div></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('network-mapper.branding.col_left')); ?></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('network-mapper.branding.col_center')); ?></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('network-mapper.branding.col_right')); ?></div>
+
+                    <div class="row-label"><?php echo htmlspecialchars(t('network-mapper.branding.row_header')); ?></div>
+                    <input type="text" id="bmHeaderLeft" maxlength="200">
+                    <input type="text" id="bmHeaderCenter" maxlength="200">
+                    <input type="text" id="bmHeaderRight" maxlength="200">
+
+                    <div class="row-label"><?php echo htmlspecialchars(t('network-mapper.branding.row_footer')); ?></div>
+                    <input type="text" id="bmFooterLeft" maxlength="200">
+                    <input type="text" id="bmFooterCenter" maxlength="200">
+                    <input type="text" id="bmFooterRight" maxlength="200">
+                </div>
+                <div class="nm-brand-tokens">
+                    <strong><?php echo htmlspecialchars(t('network-mapper.branding.tokens_label')); ?></strong><?php echo htmlspecialchars(t('network-mapper.branding.tokens_intro')); ?>
+                    <code>{{logo}}</code> &middot; <code>{{title}}</code> &middot; <code>{{author}}</code> &middot; <code>{{version}}</code> &middot; <code>{{modified}}</code>.
+                    <?php echo t('network-mapper.branding.tokens_note'); ?>
+                </div>
+            </div>
+            <div class="nm-modal-actions">
+                <button class="nm-btn secondary" onclick="NM.resetBrandingOverrides()" title="<?php echo htmlspecialchars(t('network-mapper.branding.reset_title')); ?>"><?php echo htmlspecialchars(t('network-mapper.branding.reset')); ?></button>
+                <button class="nm-btn secondary" onclick="NM.closeBrandingModal()"><?php echo htmlspecialchars(t('common.cancel')); ?></button>
+                <button class="nm-btn" onclick="NM.commitBrandingOverrides()"><?php echo htmlspecialchars(t('common.save')); ?></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="nm-modal-overlay" id="newVersionModal">
+        <div class="nm-modal">
+            <div class="nm-modal-header"><?php echo htmlspecialchars(t('network-mapper.newversion.title')); ?></div>
+            <div class="nm-modal-body">
+                <p style="font-size:13px;color:#6b7280;margin:0 0 16px 0;line-height:1.5;">
+                    <?php echo htmlspecialchars(t('network-mapper.newversion.intro')); ?>
+                </p>
+                <div class="nm-form-group">
+                    <label for="nvTitle"><?php echo htmlspecialchars(t('network-mapper.newversion.field_title')); ?></label>
+                    <input type="text" id="nvTitle" maxlength="255">
+                </div>
+                <div class="nm-form-group">
+                    <label for="nvDescription"><?php echo htmlspecialchars(t('network-mapper.newversion.field_description')); ?></label>
+                    <textarea id="nvDescription" maxlength="2000"></textarea>
+                </div>
+                <div class="nm-form-group">
+                    <label for="nvVersionLabel"><?php echo htmlspecialchars(t('network-mapper.newversion.field_version')); ?></label>
+                    <input type="text" id="nvVersionLabel" maxlength="50" placeholder="<?php echo htmlspecialchars(t('network-mapper.newversion.field_version_ph')); ?>">
+                    <small><?php echo htmlspecialchars(t('network-mapper.newversion.field_version_help')); ?></small>
+                </div>
+            </div>
+            <div class="nm-modal-actions">
+                <button class="nm-btn secondary" onclick="NM.closeNewVersionModal()"><?php echo htmlspecialchars(t('common.cancel')); ?></button>
+                <button class="nm-btn" id="nvCreateBtn" onclick="NM.createNewVersion()"><?php echo htmlspecialchars(t('network-mapper.newversion.create')); ?></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vendor: PNG/PDF export. html2canvas rasterises the diagram canvas;
+         jsPDF wraps the rasterised image into a paper-sized PDF document.
+         Loaded eagerly because the editor is a heavy page already and lazy
+         loading adds complexity for marginal gain. -->
+    <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
+    <?php echo Tz::scriptTag(); ?>
+    <script src="../assets/js/tz.js?v=1"></script>
+    <script src="../assets/js/i18n.js?v=2"></script>
+    <script src="../assets/js/vendor/html2canvas.min.js"></script>
+    <script src="../assets/js/vendor/jspdf.umd.min.js"></script>
+    <script src="../assets/js/network-mapper-icons.js"></script>
+    <script src="../assets/js/network-mapper.js?v=3"></script>
+    <script>
+        NM.init(<?php echo $diagramId; ?>);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                NM.save();
+            }
+            if (e.key === 'Escape') {
+                NM.closeNewVersionModal();
+                NM.closeObjectPicker();
+                NM.closeRelatedModal();
+                NM.closeVersionsDropdown();
+                NM.closePageDropdown();
+                NM.closeIconPicker();
+                NM.closeBrandingModal();
+            }
+        });
+
+        // Click-out to close modals
+        document.getElementById('newVersionModal').addEventListener('click', function (e) {
+            if (e.target === e.currentTarget) NM.closeNewVersionModal();
+        });
+        document.getElementById('objectPickerModal').addEventListener('click', function (e) {
+            if (e.target === e.currentTarget) NM.closeObjectPicker();
+        });
+        document.getElementById('relatedObjectsModal').addEventListener('click', function (e) {
+            if (e.target === e.currentTarget) NM.closeRelatedModal();
+        });
+        document.getElementById('iconPickerModal').addEventListener('click', function (e) {
+            if (e.target === e.currentTarget) NM.closeIconPicker();
+        });
+        document.getElementById('brandingModal').addEventListener('click', function (e) {
+            if (e.target === e.currentTarget) NM.closeBrandingModal();
+        });
+
+        // Warn on unload if there are unsaved changes — guard against the user
+        // hitting back/refresh after editing without saving
+        window.addEventListener('beforeunload', function (e) {
+            // The flag lives in the JS module; we ask it via a quick lookup.
+            // No public getter — we rely on the autosave status DOM as a proxy.
+            const status = document.getElementById('saveStatus');
+            if (status && status.classList.contains('nm-status-unsaved')) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,961 @@
+<?php
+/**
+ * Software Licences - Manage software licence records
+ */
+session_start();
+require_once '../../config.php';
+require_once '../../includes/functions.php';
+require_once '../../includes/i18n.php';
+require_once '../../includes/theme.php';
+require_once '../../includes/timezone.php';
+I18n::initFromSession();
+Tz::init();
+
+requireModuleAccess('software');
+
+$current_page = 'licences';
+$path_prefix = '../../';
+$translationNamespaces = ['common', 'software'];
+?>
+<!DOCTYPE html>
+<html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
+<head>
+    <link rel="icon" type="image/svg+xml" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>favicon.svg">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo htmlspecialchars(t('software.licences.page_title')); ?></title>
+    <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
+    <?php echo Tz::scriptTag(); ?>
+    <script src="../../assets/js/tz.js?v=1"></script>
+    <script src="../../assets/js/i18n.js?v=2"></script>
+    <link rel="stylesheet" href="../../assets/css/theme.css?v=23">
+    <link rel="stylesheet" href="../../assets/css/inbox.css">
+    <style>
+        /* Module accent (indigo). */
+        body { --accent: var(--sw-accent, #5c6bc0); --accent-hover: var(--sw-accent-hover, #3f51b5); }
+        .licence-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+            background-color: var(--surface, #fff);
+        }
+
+        .licence-toolbar {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border, #e0e0e0);
+            background-color: var(--surface-2, #f8f9fa);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .licence-toolbar h3 {
+            margin: 0;
+            font-size: 16px;
+            color: var(--text, #333);
+        }
+
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .search-box {
+            width: 300px;
+            padding: 8px 12px;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--sw-accent, #5c6bc0);
+            box-shadow: 0 0 0 2px rgba(92, 107, 192, 0.15);
+        }
+
+        .licence-count {
+            font-size: 13px;
+            color: var(--text-dim, #888);
+            white-space: nowrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--sw-accent, #5c6bc0);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--sw-accent-hover, #3f51b5);
+        }
+
+        .btn-secondary {
+            background: var(--surface-hover, #f5f5f5);
+            color: var(--text, #333);
+            border: 1px solid var(--border, #ddd);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-soft, #eee);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-export {
+            background: var(--sw-accent, #5c6bc0);
+            color: white;
+            font-size: 13px;
+            padding: 8px 14px;
+        }
+
+        .btn-export:hover {
+            background: var(--sw-accent-hover, #3f51b5);
+        }
+
+        .licence-table-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .licence-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .licence-table thead th {
+            position: sticky;
+            top: 0;
+            background-color: var(--surface-2, #f8f9fa);
+            padding: 12px 20px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-muted, #555);
+            border-bottom: 2px solid var(--border, #e0e0e0);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            user-select: none;
+            z-index: 1;
+        }
+
+        .licence-table thead th:hover {
+            background-color: var(--border-soft, #eee);
+        }
+
+        .licence-table thead th.sort-active {
+            color: var(--sw-accent, #5c6bc0);
+        }
+
+        .licence-table thead th .sort-icon {
+            margin-left: 4px;
+            font-size: 10px;
+        }
+
+        .licence-table tbody tr {
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .licence-table tbody tr:hover {
+            background-color: var(--surface-hover, #f5f5f5);
+        }
+
+        .licence-table tbody td {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-soft, #eee);
+            font-size: 14px;
+            color: var(--text, #333);
+        }
+
+        .type-badge {
+            display: inline-block;
+            background-color: var(--sw-accent-soft, #e8eaf6);
+            color: var(--sw-accent-hover, #3f51b5);
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-active {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-expired {
+            display: inline-block;
+            background: #f5f5f5;
+            color: #999;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-cancelled {
+            display: inline-block;
+            background: #fce4ec;
+            color: #c62828;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .renewal-overdue {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .renewal-warning {
+            color: #f57c00;
+            font-weight: 600;
+        }
+
+        .renewal-ok {
+            color: #2e7d32;
+        }
+
+        /* Modal overlay */
+        .detail-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 60px 20px;
+        }
+
+        .detail-overlay.open {
+            display: flex;
+        }
+
+        .detail-box {
+            background: var(--surface, #fff);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 650px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 30px var(--shadow, rgba(0, 0, 0, 0.2));
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border, #e0e0e0);
+            background: linear-gradient(135deg, var(--sw-accent, #5c6bc0), var(--sw-accent-hover, #3f51b5));
+            border-radius: 8px 8px 0 0;
+            color: white;
+        }
+
+        .detail-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .detail-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .detail-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .detail-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text, #333);
+            margin-bottom: 6px;
+        }
+
+        .form-input,
+        .form-textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--sw-accent, #5c6bc0);
+            box-shadow: 0 0 0 2px rgba(92, 107, 192, 0.15);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 70px;
+        }
+
+        .modal-footer {
+            padding: 15px 24px;
+            border-top: 1px solid var(--border, #e0e0e0);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--surface-2, #f8f9fa);
+            border-radius: 0 0 8px 8px;
+        }
+
+        .modal-footer-right {
+            display: flex;
+            gap: 10px;
+        }
+
+        .loading-spinner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--border-soft, #f3f3f3);
+            border-top: 3px solid var(--sw-accent, #5c6bc0);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: var(--text-dim, #888);
+            font-size: 14px;
+            gap: 12px;
+        }
+
+        .empty-state svg {
+            color: var(--text-faint, #ccc);
+        }
+
+        .publisher-text {
+            font-size: 12px;
+            color: var(--text-dim, #888);
+        }
+
+        .cost-text {
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <?php include '../includes/header.php'; ?>
+
+    <div class="main-container licence-container">
+        <div class="licence-toolbar">
+            <h3><?php echo htmlspecialchars(t('software.licences.heading')); ?></h3>
+            <div class="toolbar-right">
+                <input type="text" class="search-box" id="licenceSearch"
+                       placeholder="<?php echo htmlspecialchars(t('software.licences.search')); ?>" autocomplete="off"
+                       oninput="searchLicences()">
+                <span class="licence-count" id="licenceCount"></span>
+                <button class="btn btn-export" onclick="exportLicencesCSV()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <?php echo htmlspecialchars(t('software.licences.export_csv')); ?>
+                </button>
+                <button class="btn btn-primary" onclick="openLicenceModal()"><?php echo htmlspecialchars(t('software.licences.add')); ?></button>
+            </div>
+        </div>
+        <div class="licence-table-container">
+            <table class="licence-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortBy('app_name')" id="thApp">
+                            <?php echo htmlspecialchars(t('software.licences.col_application')); ?> <span class="sort-icon">&#9650;</span>
+                        </th>
+                        <th onclick="sortBy('licence_type')" id="thType">
+                            <?php echo htmlspecialchars(t('software.licences.col_type')); ?> <span class="sort-icon"></span>
+                        </th>
+                        <th onclick="sortBy('quantity')" id="thQty">
+                            <?php echo htmlspecialchars(t('software.licences.col_qty')); ?> <span class="sort-icon"></span>
+                        </th>
+                        <th onclick="sortBy('renewal_date')" id="thRenewal">
+                            <?php echo htmlspecialchars(t('software.licences.col_renewal')); ?> <span class="sort-icon"></span>
+                        </th>
+                        <th onclick="sortBy('status')" id="thStatus">
+                            <?php echo htmlspecialchars(t('software.licences.col_status')); ?> <span class="sort-icon"></span>
+                        </th>
+                        <th onclick="sortBy('cost')" id="thCost">
+                            <?php echo htmlspecialchars(t('software.licences.col_cost')); ?> <span class="sort-icon"></span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="licenceTableBody">
+                    <tr><td colspan="6">
+                        <div class="loading-spinner"><div class="spinner"></div></div>
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add/Edit Licence Modal -->
+    <div class="detail-overlay" id="licenceOverlay" onclick="if(event.target===this)closeLicenceModal()">
+        <div class="detail-box">
+            <div class="detail-header">
+                <h3 id="licenceModalTitle"><?php echo htmlspecialchars(t('software.licences.modal_add')); ?></h3>
+            </div>
+            <div class="detail-body">
+                <input type="hidden" id="licenceId" value="">
+
+                <div class="form-group">
+                    <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_application')); ?></label>
+                    <select class="form-input" id="licenceAppId">
+                        <option value=""><?php echo htmlspecialchars(t('software.licences.select_application')); ?></option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_type')); ?></label>
+                        <select class="form-input" id="licenceType">
+                            <option value=""><?php echo htmlspecialchars(t('software.licences.select_type')); ?></option>
+                            <option value="Per User"><?php echo htmlspecialchars(t('software.licences.type_per_user')); ?></option>
+                            <option value="Per Device"><?php echo htmlspecialchars(t('software.licences.type_per_device')); ?></option>
+                            <option value="Site"><?php echo htmlspecialchars(t('software.licences.type_site')); ?></option>
+                            <option value="Concurrent"><?php echo htmlspecialchars(t('software.licences.type_concurrent')); ?></option>
+                            <option value="Subscription"><?php echo htmlspecialchars(t('software.licences.type_subscription')); ?></option>
+                            <option value="Other"><?php echo htmlspecialchars(t('software.licences.type_other')); ?></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_quantity')); ?></label>
+                        <input type="number" class="form-input" id="licenceQuantity" min="0" placeholder="<?php echo htmlspecialchars(t('software.licences.quantity_placeholder')); ?>">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_key')); ?></label>
+                    <input type="text" class="form-input" id="licenceKey" placeholder="<?php echo htmlspecialchars(t('software.licences.key_placeholder')); ?>">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_cost')); ?></label>
+                        <input type="number" class="form-input" id="licenceCost" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_currency')); ?></label>
+                        <select class="form-input" id="licenceCurrency">
+                            <option value="GBP">GBP (£)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_purchase_date')); ?></label>
+                        <input type="date" class="form-input" id="licencePurchaseDate">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_renewal_date')); ?></label>
+                        <input type="date" class="form-input" id="licenceRenewalDate">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_notice_days')); ?></label>
+                        <input type="number" class="form-input" id="licenceNoticeDays" min="0" placeholder="<?php echo htmlspecialchars(t('software.licences.notice_placeholder')); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_status')); ?></label>
+                        <select class="form-input" id="licenceStatus">
+                            <option value="Active"><?php echo htmlspecialchars(t('software.licences.status_active')); ?></option>
+                            <option value="Expired"><?php echo htmlspecialchars(t('software.licences.status_expired')); ?></option>
+                            <option value="Cancelled"><?php echo htmlspecialchars(t('software.licences.status_cancelled')); ?></option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_portal_url')); ?></label>
+                    <input type="url" class="form-input" id="licencePortalUrl" placeholder="https://...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_vendor')); ?></label>
+                    <input type="text" class="form-input" id="licenceVendorContact" placeholder="<?php echo htmlspecialchars(t('software.licences.vendor_placeholder')); ?>">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><?php echo htmlspecialchars(t('software.licences.field_notes')); ?></label>
+                    <textarea class="form-textarea" id="licenceNotes" rows="3" placeholder="<?php echo htmlspecialchars(t('software.licences.notes_placeholder')); ?>"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="deleteLicenceBtn" onclick="deleteLicence()" style="display: none;"><?php echo htmlspecialchars(t('software.licences.delete')); ?></button>
+                <div class="modal-footer-right">
+                    <button class="btn btn-secondary" onclick="closeLicenceModal()"><?php echo htmlspecialchars(t('software.licences.cancel')); ?></button>
+                    <button class="btn btn-primary" onclick="saveLicence()"><?php echo htmlspecialchars(t('software.licences.save')); ?></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '../../api/software/';
+        let allLicences = [];
+        let filteredLicences = [];
+        let allApps = [];
+        let searchTimeout = null;
+        let sortColumn = 'app_name';
+        let sortDirection = 'asc';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadApps();
+            loadLicences();
+        });
+
+        async function loadApps() {
+            try {
+                const response = await fetch(API_BASE + 'get_apps.php');
+                const data = await response.json();
+                if (data.success) {
+                    allApps = data.apps;
+                }
+            } catch (error) {
+                console.error('Error loading apps:', error);
+            }
+        }
+
+        async function loadLicences() {
+            try {
+                const response = await fetch(API_BASE + 'get_licences.php');
+                const data = await response.json();
+                if (data.success) {
+                    allLicences = data.licences;
+                    filteredLicences = [...allLicences];
+                    applySortAndRender();
+                } else {
+                    document.getElementById('licenceTableBody').innerHTML =
+                        '<tr><td colspan="6"><div class="empty-state">' + window.t('software.licences.load_error', { message: escapeHtml(data.error) }) + '</div></td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading licences:', error);
+                document.getElementById('licenceTableBody').innerHTML =
+                    '<tr><td colspan="6"><div class="empty-state">' + window.t('software.licences.load_failed') + '</div></td></tr>';
+            }
+        }
+
+        function searchLicences() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const search = document.getElementById('licenceSearch').value.toLowerCase().trim();
+                if (search === '') {
+                    filteredLicences = [...allLicences];
+                } else {
+                    filteredLicences = allLicences.filter(l =>
+                        (l.app_name || '').toLowerCase().includes(search) ||
+                        (l.app_publisher || '').toLowerCase().includes(search) ||
+                        (l.licence_type || '').toLowerCase().includes(search) ||
+                        (l.licence_key || '').toLowerCase().includes(search) ||
+                        (l.vendor_contact || '').toLowerCase().includes(search) ||
+                        (l.notes || '').toLowerCase().includes(search)
+                    );
+                }
+                applySortAndRender();
+            }, 300);
+        }
+
+        function sortBy(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            applySortAndRender();
+        }
+
+        function applySortAndRender() {
+            filteredLicences.sort((a, b) => {
+                let valA, valB;
+                if (sortColumn === 'quantity' || sortColumn === 'cost') {
+                    valA = parseFloat(a[sortColumn]) || 0;
+                    valB = parseFloat(b[sortColumn]) || 0;
+                } else {
+                    valA = (a[sortColumn] || '').toString().toLowerCase();
+                    valB = (b[sortColumn] || '').toString().toLowerCase();
+                }
+                if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+            renderTable();
+            updateSortIndicators();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('licenceTableBody');
+            const countEl = document.getElementById('licenceCount');
+
+            countEl.textContent = window.t(filteredLicences.length !== 1 ? 'software.licences.count_many' : 'software.licences.count_one', { count: filteredLicences.length });
+
+            if (filteredLicences.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                    </svg>
+                    ${window.t('software.licences.none')}
+                </div></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filteredLicences.map(l => {
+                const renewalClass = getRenewalClass(l.renewal_date, l.notice_period_days);
+                const statusClass = 'status-' + (l.status || 'active').toLowerCase();
+                return `
+                <tr onclick="openLicenceModal(${l.id})">
+                    <td>
+                        ${escapeHtml(l.app_name)}
+                        ${l.app_publisher ? '<div class="publisher-text">' + escapeHtml(l.app_publisher) + '</div>' : ''}
+                    </td>
+                    <td><span class="type-badge">${escapeHtml(l.licence_type)}</span></td>
+                    <td>${l.quantity != null ? escapeHtml(String(l.quantity)) : '\u2014'}</td>
+                    <td class="${renewalClass}">${l.renewal_date ? formatDate(l.renewal_date) : '\u2014'}</td>
+                    <td><span class="${statusClass}">${escapeHtml(l.status)}</span></td>
+                    <td class="cost-text">${formatCost(l.cost, l.currency)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function getRenewalClass(renewalDate, noticeDays) {
+            if (!renewalDate) return '';
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const renewal = new Date(renewalDate + 'T00:00:00');
+            if (renewal < today) return 'renewal-overdue';
+            const notice = noticeDays || 30;
+            const warningDate = new Date(renewal);
+            warningDate.setDate(warningDate.getDate() - notice);
+            if (today >= warningDate) return 'renewal-warning';
+            return 'renewal-ok';
+        }
+
+        function formatCost(cost, currency) {
+            if (cost == null || cost === '') return '\u2014';
+            const symbols = { GBP: '\u00A3', USD: '$', EUR: '\u20AC' };
+            const symbol = symbols[currency] || currency + ' ';
+            return symbol + parseFloat(cost).toFixed(2);
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr + 'T00:00:00');
+            if (isNaN(d)) return dateStr;
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        function openLicenceModal(licenceId) {
+            // Reset form
+            document.getElementById('licenceId').value = '';
+            document.getElementById('licenceAppId').value = '';
+            document.getElementById('licenceType').value = '';
+            document.getElementById('licenceQuantity').value = '';
+            document.getElementById('licenceKey').value = '';
+            document.getElementById('licenceCost').value = '';
+            document.getElementById('licenceCurrency').value = 'GBP';
+            document.getElementById('licencePurchaseDate').value = '';
+            document.getElementById('licenceRenewalDate').value = '';
+            document.getElementById('licenceNoticeDays').value = '';
+            document.getElementById('licenceStatus').value = 'Active';
+            document.getElementById('licencePortalUrl').value = '';
+            document.getElementById('licenceVendorContact').value = '';
+            document.getElementById('licenceNotes').value = '';
+            document.getElementById('deleteLicenceBtn').style.display = 'none';
+
+            // Populate app dropdown
+            const appSelect = document.getElementById('licenceAppId');
+            appSelect.innerHTML = '<option value="">' + window.t('software.licences.select_application') + '</option>';
+            allApps.forEach(app => {
+                const opt = document.createElement('option');
+                opt.value = app.id;
+                opt.textContent = app.display_name + (app.publisher ? ' (' + app.publisher + ')' : '');
+                appSelect.appendChild(opt);
+            });
+
+            if (licenceId) {
+                // Edit mode
+                document.getElementById('licenceModalTitle').textContent = window.t('software.licences.modal_edit');
+                const licence = allLicences.find(l => l.id == licenceId);
+                if (licence) {
+                    document.getElementById('licenceId').value = licence.id;
+                    document.getElementById('licenceAppId').value = licence.app_id;
+                    document.getElementById('licenceType').value = licence.licence_type;
+                    document.getElementById('licenceQuantity').value = licence.quantity != null ? licence.quantity : '';
+                    document.getElementById('licenceKey').value = licence.licence_key || '';
+                    document.getElementById('licenceCost').value = licence.cost != null ? licence.cost : '';
+                    document.getElementById('licenceCurrency').value = licence.currency || 'GBP';
+                    document.getElementById('licencePurchaseDate').value = licence.purchase_date || '';
+                    document.getElementById('licenceRenewalDate').value = licence.renewal_date || '';
+                    document.getElementById('licenceNoticeDays').value = licence.notice_period_days != null ? licence.notice_period_days : '';
+                    document.getElementById('licenceStatus').value = licence.status || 'Active';
+                    document.getElementById('licencePortalUrl').value = licence.portal_url || '';
+                    document.getElementById('licenceVendorContact').value = licence.vendor_contact || '';
+                    document.getElementById('licenceNotes').value = licence.notes || '';
+                    document.getElementById('deleteLicenceBtn').style.display = 'inline-flex';
+                }
+            } else {
+                document.getElementById('licenceModalTitle').textContent = window.t('software.licences.modal_add_caps');
+            }
+
+            document.getElementById('licenceOverlay').classList.add('open');
+        }
+
+        function closeLicenceModal() {
+            document.getElementById('licenceOverlay').classList.remove('open');
+        }
+
+        async function saveLicence() {
+            const appId = document.getElementById('licenceAppId').value;
+            const licenceType = document.getElementById('licenceType').value;
+
+            if (!appId) {
+                showToast(window.t('software.licences.select_app_warn'), 'error');
+                return;
+            }
+            if (!licenceType) {
+                showToast(window.t('software.licences.select_type_warn'), 'error');
+                return;
+            }
+
+            const payload = {
+                id: document.getElementById('licenceId').value || null,
+                app_id: parseInt(appId),
+                licence_type: licenceType,
+                licence_key: document.getElementById('licenceKey').value,
+                quantity: document.getElementById('licenceQuantity').value,
+                cost: document.getElementById('licenceCost').value,
+                currency: document.getElementById('licenceCurrency').value,
+                purchase_date: document.getElementById('licencePurchaseDate').value,
+                renewal_date: document.getElementById('licenceRenewalDate').value,
+                notice_period_days: document.getElementById('licenceNoticeDays').value,
+                status: document.getElementById('licenceStatus').value,
+                portal_url: document.getElementById('licencePortalUrl').value,
+                vendor_contact: document.getElementById('licenceVendorContact').value,
+                notes: document.getElementById('licenceNotes').value
+            };
+
+            try {
+                const response = await fetch(API_BASE + 'save_licence.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    closeLicenceModal();
+                    loadLicences();
+                } else {
+                    showToast(window.t('software.licences.save_error', { message: data.error }), 'error');
+                }
+            } catch (error) {
+                console.error('Error saving licence:', error);
+                showToast(window.t('software.licences.save_failed'), 'error');
+            }
+        }
+
+        async function deleteLicence() {
+            const id = document.getElementById('licenceId').value;
+            if (!id) return;
+            if (!(await showConfirm({ title: window.t('software.licences.delete_confirm_title'), message: window.t('software.licences.delete_confirm'), okLabel: window.t('software.licences.delete_ok'), okClass: 'danger' }))) return;
+
+            try {
+                const response = await fetch(API_BASE + 'delete_licence.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: parseInt(id) })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    closeLicenceModal();
+                    loadLicences();
+                } else {
+                    showToast(window.t('software.licences.delete_error', { message: data.error }), 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting licence:', error);
+                showToast(window.t('software.licences.delete_failed'), 'error');
+            }
+        }
+
+        function exportLicencesCSV() {
+            if (!filteredLicences.length) return;
+
+            const headers = [
+                window.t('software.licences.csv_application'),
+                window.t('software.licences.csv_publisher'),
+                window.t('software.licences.csv_type'),
+                window.t('software.licences.csv_quantity'),
+                window.t('software.licences.csv_key'),
+                window.t('software.licences.csv_renewal'),
+                window.t('software.licences.csv_notice'),
+                window.t('software.licences.csv_status'),
+                window.t('software.licences.csv_cost'),
+                window.t('software.licences.csv_currency'),
+                window.t('software.licences.csv_purchase'),
+                window.t('software.licences.csv_portal'),
+                window.t('software.licences.csv_vendor'),
+                window.t('software.licences.csv_notes')
+            ];
+            const rows = [headers.map(h => csvCell(h)).join(',')];
+
+            filteredLicences.forEach(l => {
+                rows.push([
+                    csvCell(l.app_name || ''),
+                    csvCell(l.app_publisher || ''),
+                    csvCell(l.licence_type || ''),
+                    csvCell(l.quantity != null ? String(l.quantity) : ''),
+                    csvCell(l.licence_key || ''),
+                    csvCell(l.renewal_date || ''),
+                    csvCell(l.notice_period_days != null ? String(l.notice_period_days) : ''),
+                    csvCell(l.status || ''),
+                    csvCell(l.cost != null ? String(l.cost) : ''),
+                    csvCell(l.currency || ''),
+                    csvCell(l.purchase_date || ''),
+                    csvCell(l.portal_url || ''),
+                    csvCell(l.vendor_contact || ''),
+                    csvCell(l.notes || '')
+                ].join(','));
+            });
+
+            const csv = '\uFEFF' + rows.join('\r\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = window.t('software.licences.csv_filename') + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function csvCell(text) {
+            text = String(text);
+            if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+                return '"' + text.replace(/"/g, '""') + '"';
+            }
+            return text;
+        }
+
+        function updateSortIndicators() {
+            const columns = {
+                'app_name': 'thApp',
+                'licence_type': 'thType',
+                'quantity': 'thQty',
+                'renewal_date': 'thRenewal',
+                'status': 'thStatus',
+                'cost': 'thCost'
+            };
+
+            Object.entries(columns).forEach(([col, id]) => {
+                const th = document.getElementById(id);
+                const icon = th.querySelector('.sort-icon');
+                if (col === sortColumn) {
+                    th.classList.add('sort-active');
+                    icon.textContent = sortDirection === 'asc' ? '\u25B2' : '\u25BC';
+                } else {
+                    th.classList.remove('sort-active');
+                    icon.textContent = '';
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeLicenceModal();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,2801 @@
+/* ============================================================================
+   mobile.css  —  Mobile-friendly overrides for the on-the-go analyst.
+
+   HARD RULE: every rule in this file lives inside a `@media (max-width: 768px)`
+   block. Above that breakpoint these rules do not exist, so the desktop render
+   is byte-identical — the same safety-net approach that let dark mode roll out
+   without touching light mode. New mobile-only affordances (back chevron, etc.)
+   ship `display:none` by default and are only revealed here.
+
+   Load this AFTER the module's own stylesheet so its @media rules win on ties.
+   Rollout is gradual/per-page (like theme.css): a page opts in by linking it.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+
+    /* ====================================================================
+       LAYER 1 — App shell: top bar + module drawer + view strip
+       ==================================================================== */
+
+    /* The header is a flex row of three children:
+         .waffle-menu-container | .header-nav | .header-right
+       On mobile: the waffle (left) switches MODULES; an injected hamburger
+       (right) opens the tickets VIEWS as a right-side drawer (.header-nav).
+       waffle gets margin-right:auto so account + hamburger sit at the right. */
+    .header {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+    .waffle-menu-container { order: 1; min-width: 0; margin-right: auto; }
+    .header-right          { order: 2; }
+    .mobile-views-btn {
+        order: 3;
+        background: none;
+        border: none;
+        color: inherit;
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 4px 6px;
+    }
+
+    /* .header-nav (the 8 tickets views) -> right-side slide-in drawer. */
+    .header-nav {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: auto;
+        margin-left: 0;
+        height: 100dvh;
+        width: 74vw;
+        max-width: 300px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        background: var(--surface, #fff);
+        box-shadow: -4px 0 30px rgba(0, 0, 0, 0.35);
+        padding: 58px 12px 16px;        /* top pad clears the top bar */
+        overflow-y: auto;
+        z-index: 3000;
+        transform: translateX(100%);
+        visibility: hidden;
+        transition: transform 0.22s ease, visibility 0.22s;
+    }
+    body.mobile-views-open .header-nav { transform: translateX(0); visibility: visible; }
+    /* In the white drawer the nav buttons need dark text (they're light-on-accent
+       in the header) and a full-width, left-aligned list layout. */
+    .header-nav .nav-btn,
+    .header-nav .nav-btn:link,
+    .header-nav .nav-btn:visited {
+        color: var(--text, #333) !important;
+        background: none !important;
+        border: none !important;
+        justify-content: flex-start;
+        padding: 12px 14px;
+        font-size: 15px;
+    }
+    .header-nav .nav-btn.active { background: var(--surface-hover, #f0f0f0) !important; }
+    .header-nav .nav-btn svg { width: 20px; height: 20px; }
+
+    /* Dim backdrop behind the views drawer (injected by mobile.js). */
+    .mobile-views-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2999;
+        display: none;
+    }
+    body.mobile-views-open .mobile-views-overlay { display: block; background: rgba(0, 0, 0, 0.4); }
+
+    .waffle-btn { margin-right: 8px; }
+    .module-title {
+        font-size: 15px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* The waffle panel's mobile drawer treatment now lives in the SHARED waffle
+       component (includes/waffle-menu.php) so it works on every page, not just
+       here. Kept out of mobile.css to avoid a duplicate source of truth. */
+
+    /* The user/account dropdown can overflow a narrow screen — clamp it. */
+    .user-menu {
+        right: 8px;
+        max-width: calc(100vw - 16px);
+    }
+
+    /* ====================================================================
+       LAYER 2 — Inbox master-detail: folders / list / conversation stack
+       (Outlook-style — one pane on screen at a time, slide between them.)
+       State lives in body[data-mobile-pane="list|folders|reading"], set by
+       mobile.js. On desktop that attribute is absent AND these rules don't
+       apply, so the desktop 3-pane split is entirely untouched.
+       ==================================================================== */
+
+    /* Column layout so the (taller, wrapped) header + sub-bar take their natural
+       height and the pane area flexes to fill the rest — no fragile calc(). */
+    body {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;                 /* dvh copes with mobile browser chrome */
+    }
+    .header { flex-shrink: 0; }
+
+    .main-container {
+        height: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* The three panes stack and fill the container; one shows at a time. */
+    .folder-container,
+    .email-list-container,
+    .reading-pane {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        max-width: none;
+        border-right: none;
+        transition: transform 0.25s ease;
+    }
+
+    /* Default = list. Folders parked off-left, reading parked off-right. */
+    .folder-container     { transform: translateX(-100%); z-index: 2; }
+    .email-list-container { transform: translateX(0);     z-index: 1; }
+    .reading-pane         { transform: translateX(100%);  z-index: 3; }
+
+    body[data-mobile-pane="folders"] .folder-container     { transform: translateX(0); }
+    body[data-mobile-pane="folders"] .email-list-container { transform: translateX(100%); }
+
+    body[data-mobile-pane="reading"] .email-list-container { transform: translateX(-100%); }
+    body[data-mobile-pane="reading"] .reading-pane         { transform: translateX(0); }
+
+    /* ---- Mobile sub-bar (Back / Folders) — injected by mobile.js ---- */
+    .mobile-subbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: var(--surface, #fff);
+        border-bottom: 1px solid var(--border, #ddd);
+        flex-shrink: 0;
+    }
+    .mobile-subbar button {
+        background: none;
+        border: none;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--accent, #0078d4);
+        cursor: pointer;
+        padding: 4px 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    /* Which control shows depends on the current pane. */
+    body[data-mobile-pane="list"] .msb-back { display: none; }
+    body:not([data-mobile-pane="list"]) .msb-folders { display: none; }
+
+    /* ====================================================================
+       LAYER 3 — Modals become full-screen sheets on mobile.
+       Targets the canonical .modal-content (used app-wide) so the reply /
+       compose editor (#emailModal + TinyMCE), the note modal, the new-ticket
+       form, pickers etc. get the whole screen instead of a cramped centred
+       box. !important beats per-page .modal-content width/max-width rules,
+       since a page's own <style> loads after mobile.css.
+       ==================================================================== */
+    .modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        border-radius: 0 !important;
+    }
+    .modal-header { padding: 14px 16px; font-size: 18px; }
+    .modal-body   { padding: 16px; }
+    .modal-footer { padding: 12px 16px; }
+
+    /* Two-column form rows inside modals (e.g. reply To/Cc, set inline as a
+       1fr 1fr grid) stack to one column on a phone. !important beats the
+       element's inline grid-template-columns. */
+    .modal-content .form-row { grid-template-columns: 1fr !important; }
+
+    /* Add-note: on a phone this fills the screen (its own panel), so the note
+       box should fill it too instead of a small fixed-height textarea with dead
+       space below. Scoped to #noteModal so multi-field forms (reply, new ticket)
+       keep their natural per-field sizing. */
+    #noteModal .modal-body { display: flex; flex-direction: column; }
+    #noteModal .form-group {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        margin-bottom: 0;
+    }
+    /* font-size:16px is REQUIRED here (not cosmetic): iOS Safari zooms in on
+       focus for any field under 16px, which then mangles this fixed full-screen
+       sheet (it spills wide, Safari reflows to a desktop-width layout, and the
+       max-width:768px rules stop matching → the big centred desktop modal).
+       Set at ID specificity so nothing overrides it. */
+    #noteModal .form-textarea { flex: 1; min-height: 0; resize: none; font-size: 16px; }
+
+    /* Same anti-zoom for every other modal field on mobile. */
+    .modal-content .form-input,
+    .modal-content .form-textarea,
+    .modal-content .form-select {
+        font-size: 16px;
+    }
+
+    /* ...except that rule was never reaching the typed inputs (#998).
+       inbox.css:2653 styles modal fields as
+           `.modal .form-group input[type="date"] { font-size: 14px }`
+       — (0,3,1) against the (0,2,0) above, so it wins on specificity no matter
+       what order the files load in. Every native date / time / number / email
+       field in every modal has therefore stayed at 14px on a phone, which is
+       the one thing that must not happen: under 16px iOS zooms on focus, the
+       sheet spills wide, Safari reflows to a desktop-width layout and the whole
+       `max-width: 768px` block switches off (Techniques wiki §3). #767 fixed
+       the WIDTH of these same fields and this was hiding behind it.
+
+       The selector list is mirrored deliberately rather than shortened: it
+       matches inbox.css's specificity exactly, and mobile.css is linked last,
+       so the tie breaks here. Anything broader would need !important. */
+    .modal .form-group input[type="text"],
+    .modal .form-group input[type="email"],
+    .modal .form-group input[type="password"],
+    .modal .form-group input[type="url"],
+    .modal .form-group input[type="search"],
+    .modal .form-group input[type="tel"],
+    .modal .form-group input[type="number"],
+    .modal .form-group input[type="date"],
+    .modal .form-group input[type="datetime-local"],
+    .modal .form-group input[type="time"],
+    .modal .form-group select,
+    .modal .form-group textarea {
+        font-size: 16px;
+    }
+
+    /* Reply / forward: the same full-panel treatment. The To/Cc row already
+       stacks to one column (LAYER 3) and those inputs are 16px (above); here the
+       rich-text editor grows to fill the sheet between the fields and the Send
+       bar, so there's a proper composing area instead of a short fixed box with
+       dead space. The message form-group is found via its (hidden-once-TinyMCE-
+       -mounts but still present) #emailBody textarea. */
+    #emailModal .modal-body { display: flex; flex-direction: column; }
+    #emailModal .modal-body > .form-group:has(#emailBody) {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    #emailModal .modal-body > .form-group:has(#emailBody) .tox-tinymce {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto !important;        /* beat TinyMCE's inline fixed height */
+    }
+
+    /* Native date/time inputs (e.g. the schedule panel) get an intrinsic width
+       from iOS Safari that ignores width:100% (the grey field spills off the
+       right of the sheet). -webkit-appearance:none makes iOS honour the box
+       model; the ::-webkit-date-and-time-value reset removes its default margin
+       that also pushes width. The native picker still opens on tap. */
+    .modal-content input[type="date"],
+    .modal-content input[type="time"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .modal-content input[type="date"]::-webkit-date-and-time-value,
+    .modal-content input[type="time"]::-webkit-date-and-time-value {
+        margin: 0;
+        text-align: left;
+    }
+    #scheduleModal .modal-body { overflow-x: hidden; }
+    /* Small gap between the ticket subject line and the first "Date" field. */
+    #scheduleModal .schedule-ticket-info { margin-bottom: 12px; }
+
+    /* ====================================================================
+       LAYER 4 — Reading-pane density on mobile.
+       The ticket detail sections use a roomy 30px side padding for desktop;
+       on a phone that squeezes content into a narrow middle. Trim just the
+       horizontal padding (vertical rhythm preserved) and ease the big subject.
+       ==================================================================== */
+    .email-header,
+    .ticket-properties-header,
+    .ticket-toolbar,
+    .action-toolbar,
+    .problem-strip,
+    .attachment-info-bar,
+    .recordings-strip {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+    .email-subject-line { font-size: 20px; }
+
+    /* ====================================================================
+       LAYER 5 — Reading-pane action toolbar: icon-only, pinned to the BOTTOM.
+       The actions (note/reply/forward/schedule/AI/audit/feedback/delete +
+       the injected Links/Properties/Time/Objects sheet buttons) drop their
+       words to emoji icons and wrap onto two rows. Flex `order` moves the bar
+       below the scrolling email body so it sits at the bottom of the screen.
+       ==================================================================== */
+    .email-body { order: 5; }        /* fills the space above the bar (already scrolls) */
+    .action-toolbar {
+        order: 10;                   /* pin to the bottom of the reading pane */
+        flex-wrap: wrap;             /* two rows of icon buttons */
+        flex-shrink: 0;
+        gap: 6px;
+        border-top: 1px solid var(--border, #e0e0e0);
+        border-bottom: none;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+    .action-toolbar .action-btn { flex: 0 0 auto; padding: 9px 13px; }
+    .action-toolbar .action-btn span:not(.action-btn-icon) { display: none; }
+    .action-toolbar .action-btn-icon { font-size: 18px; }
+
+    /* ====================================================================
+       LAYER 6 — Collapsible ticket header (Gmail-app style).
+       On a phone the From/To/Date/Cc meta starts collapsed behind the subject;
+       tap the subject row (chevron) to reveal it. mobile.js toggles .meta-open.
+       The desktop-only fullscreen popout toggle is hidden (the reading pane is
+       already full-screen here).
+       ==================================================================== */
+    .ticket-popout-toggle { display: none; }
+    .email-subject-line { cursor: pointer; }
+    .email-subject-line::after {
+        content: '\25BE';               /* ▾ */
+        margin-left: auto;
+        font-size: 14px;
+        color: var(--text-dim, #888);
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+    }
+    .email-header.meta-open .email-subject-line::after { transform: rotate(180deg); }
+    .email-header .email-meta { display: none; }
+    .email-header.meta-open .email-meta { display: block; }
+
+    /* ====================================================================
+       LAYER 7 — Section sheets: crowded reading-pane sections on their own
+       panel. mobile.js relocates the nodes (links / properties / time entries /
+       affected CMDB objects) into these full-screen sheets and adds a button
+       for each to the action toolbar. Shown/hidden by JS (display none/flex).
+       ==================================================================== */
+    .mobile-sheet {
+        position: fixed;
+        inset: 0;
+        z-index: 1500;
+        background: var(--surface, #fff);
+        flex-direction: column;         /* display toggled in JS */
+    }
+    .ms-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border, #ddd);
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text, #333);
+        flex-shrink: 0;
+    }
+    /* Finger-friendly blue "Close" button (replaces the small ✕). */
+    .ms-close {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        padding: 8px 18px;
+        border: none;
+        border-radius: 8px;
+        background: var(--accent, #0078d4);
+        color: var(--on-accent, #fff);
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .ms-body { flex: 1; overflow-y: auto; padding: 12px 16px 24px; }
+
+    /* Links sheet: give each strip's label its own line, badges + button room. */
+    .ms-body .problem-strip {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 0;
+        background: none;
+        border: none;
+        border-bottom: 1px solid var(--border-soft, #eee);
+    }
+    /* The sheet's own "Links" title already labels this, so drop the panel's
+       duplicate "Links" heading. */
+    .ms-body .problem-strip-label { display: none; }
+    /* "Link to…" as a finger-friendly pill, on its own full-width row beneath
+       the link pills, with roomier menu items. */
+    .ms-body .link-add-wrap { width: 100%; margin-left: 0; }
+    .ms-body .problem-link-btn {
+        margin-left: 0;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 9px 16px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .ms-body .link-add-menu { left: 0; right: 0; min-width: 0; }
+    .ms-body .link-add-menu button { padding: 13px 16px; font-size: 15px; }
+
+    /* Properties sheet: the panel is an absolute collapsible dropdown on desktop;
+       in the sheet render it inline and fully expanded (no toggle needed). */
+    .ms-body .ticket-properties-container { z-index: auto; }
+    /* Drop the collapsible inner header entirely: the sheet's own "Properties"
+       title already labels it, and its Dept/Status/Owner summary both repeats
+       the dropdowns below and spills off a narrow screen. */
+    .ms-body .ticket-properties-header { display: none; }
+    .ms-body .ticket-properties-panel {
+        position: static !important;
+        max-height: none !important;
+        opacity: 1 !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+        border-bottom: none !important;
+        background: none !important;
+    }
+    /* Let the dropdown grid use the sheet's full width (the toolbar carries a
+       roomy desktop side padding on top of the sheet's own). Comfortable
+       two-up columns with a bit more breathing room between fields. */
+    .mobile-sheet-props .ticket-toolbar {
+        padding: 4px 0 8px;
+        gap: 14px 12px;
+    }
+    .mobile-sheet-props .toolbar-select { min-width: 0; }
+
+    /* ====================================================================
+       LAYER 8 — Opened-ticket refinements (device-test loop with Ed):
+       (1) ticket reference pinned right of the Back button in the sub-bar,
+       (2) subject-only truncated heading with a compact attachment badge,
+       (3) single-row action bar with a "…" overflow panel.
+       All of the moved/added nodes are injected by mobile.js on mobile only.
+       ==================================================================== */
+
+    /* (1) Reference — same colour + size as the Back control, right-aligned,
+       shown only while a ticket is open (reading pane). */
+    .msb-ref {
+        display: none;
+        margin-left: auto;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--accent, #0078d4);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 55%;
+        padding-left: 8px;
+    }
+    body[data-mobile-pane="reading"] .msb-ref { display: inline-block; }
+
+    /* (2) Subject heading: one truncated line. The chevron (email-details toggle)
+       sits immediately after the subject text; the attachment badge is pushed to
+       the far right so the two are well separated (Ed kept tapping the pill when
+       reaching for the arrow). Tighter spacing below the subject too. */
+    .email-header { padding-top: 12px; padding-bottom: 10px; }
+    .email-header .email-subject-line { margin-bottom: 6px; }
+    .email-subject-line { gap: 8px; }
+    .email-subject-line .email-subject-text {
+        flex: 0 1 auto;              /* natural width so the chevron sits beside it */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    /* Chevron right after the subject (was pinned far right next to the badge). */
+    .email-subject-line::after { margin-left: 6px; order: 1; }
+
+    /* The full yellow attachment bar is replaced by the badge on mobile.
+       renderAttachmentInfoBar sets an inline display, so !important is needed. */
+    .attachment-info-bar { display: none !important; }
+    .mobile-attach-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        flex-shrink: 0;
+        order: 2;                    /* after the chevron → pinned far right */
+        margin-left: auto;
+        background: var(--warning-bg, #fff3cd);
+        color: var(--warning-text, #856404);
+        border: 1px solid #ffc107;
+        border-radius: 11px;
+        padding: 2px 9px;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.4;
+        cursor: pointer;
+    }
+    .mobile-attach-badge .mab-clip { font-size: 12px; }
+
+    /* (3) Action bar forced to a single row of five icons + the "…" button. */
+    .action-toolbar {
+        flex-wrap: nowrap;
+        justify-content: space-around;
+        position: relative;             /* anchor for the overflow panel */
+    }
+    .action-toolbar .action-btn { padding: 9px 8px; }
+
+    /* Overflow panel: a labelled popover above the bar holding the 6th+ actions. */
+    .mobile-more-panel {
+        position: absolute;
+        right: 6px;
+        bottom: calc(100% + 6px);
+        min-width: 190px;
+        background: var(--surface, #fff);
+        border: 1px solid var(--border, #ddd);
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+        padding: 6px;
+        flex-direction: column;
+        gap: 2px;
+        z-index: 1600;
+    }
+    .mobile-more-panel .action-btn {
+        justify-content: flex-start;
+        width: 100%;
+        gap: 12px;
+        padding: 11px 14px;
+        border: none;
+    }
+    /* In the panel the actions regain their word labels (hidden on the bar). */
+    .mobile-more-panel .action-btn span:not(.action-btn-icon) { display: inline; }
+    .mobile-more-panel .action-btn .action-btn-icon { font-size: 18px; }
+
+    /* Company (tenant) switcher relocated into the module drawer (mobile.js).
+       Its header styling is white-on-blue for the top bar; recolour it for the
+       light drawer and make it a full-width row. The dropdown keeps its own
+       (already light) styling and opens beneath the button. */
+    .waffle-panel .tenant-switcher { margin: 0 0 14px; }
+    .waffle-panel .tenant-switcher-btn {
+        width: 100%;
+        max-width: none;
+        height: 40px;
+        justify-content: space-between;
+        border-radius: 8px;
+        background: var(--surface-hover, #eef1f4);
+        color: var(--text, #333);
+    }
+    .waffle-panel .tenant-switcher-btn:hover { background: var(--surface-3, #e4e8ec); }
+
+    /* Backstop for the desktop pop-out mode (also stripped in JS): never let it
+       hide the list or re-pad the reading pane on a phone, or Back has nothing
+       to return to and the conversation is squeezed into a sliver. */
+    body.ticket-popout .folder-container,
+    body.ticket-popout .email-list-container { display: block; }
+    body.ticket-popout .reading-pane { position: absolute; padding-right: 0; }
+
+    /* ====================================================================
+       LAYER 9 — Ask-AI chat panel. A right-side 420px slide-in on desktop;
+       on a phone it goes full-width (the 420px panel is wider than the screen
+       and would sit off-centre) and its input is 16px so focusing it doesn't
+       trigger the iOS auto-zoom. It's already a flex column, so the message
+       list scrolls and the input bar stays pinned at the bottom.
+       ==================================================================== */
+    .ai-chat-panel {
+        width: 100%;
+        right: -100%;               /* fully off-screen when closed */
+        height: 100dvh;
+    }
+    .ai-chat-panel.active { right: 0; }
+    .ai-chat-input-area textarea { font-size: 16px; }
+
+    /* ====================================================================
+       LAYER 10 — Audit history sheet. A 5-column table (Date/Analyst/Field/
+       Old/New) is the wrong shape for a phone — it's wider than the screen,
+       and on iOS that width makes Safari reflow to a desktop layout, which
+       switches these mobile rules off and drops the modal back to a centred
+       box. So on mobile, audit is NOT the desktop modal at all: mobile.js
+       routes it through the same .mobile-sheet chrome as the Links/Properties/
+       Time/Objects sheets (LAYER 7 styles the sheet itself) and fills it with
+       this day-grouped card feed, which is always narrower than the screen and
+       so never triggers the reflow. Desktop keeps the table, untouched.
+       ==================================================================== */
+
+    /* Drop the scroll area's top padding for THIS sheet only: the shared
+       .ms-body has padding-top, which makes the sticky day heading stick to the
+       content-box top — i.e. below that padding — leaving a transparent strip
+       under the header where scrolling rows show through above the stuck date.
+       With it removed the date tucks flush under the header and its own opaque
+       top padding (below) is the only gap, so nothing can scroll past it. */
+    .mobile-sheet-audit .ms-body { padding-top: 0; }
+
+    /* Loading / empty / error line inside the audit sheet. */
+    .mobile-sheet-audit .ma-note { color: var(--text-muted, #888); padding: 8px 0; }
+    .mobile-sheet-audit .ma-note.error { color: var(--danger, #c62828); }
+
+    /* Sticky day heading — the date is said once per day rather than repeated
+       on every row, which is most of what the Date column spent its width on.
+       Its background is opaque and its top padding sits flush under the header,
+       so rows scroll cleanly beneath it with no peek-through gap. */
+    .ma-day {
+        /* block so the shaded bar fills the width (the heading node is a
+           <span>, which would otherwise shrink-wrap the text). */
+        display: block;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        /* Full-bleed shaded bar: the negative side margins exactly cancel the
+           .ms-body side padding so it runs edge-to-edge, and the matching side
+           padding keeps the text aligned with the rows. Margins == padding, so
+           it can never widen the sheet. */
+        margin: 0 -16px;
+        padding: 9px 16px 7px;
+        background: var(--surface-hover, #f0f0f0);
+        border-bottom: 1px solid var(--border, #e0e0e0);
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-muted, #888);
+    }
+
+    .ma-entry {
+        padding: 10px 0 12px;
+        border-bottom: 1px solid var(--border-soft, #eee);
+    }
+    .ma-entry:last-child { border-bottom: none; }
+
+    .ma-top {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+    }
+    .ma-field {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text, #333);
+    }
+    .ma-time {
+        margin-left: auto;
+        flex-shrink: 0;
+        font-size: 12px;
+        color: var(--text-muted, #999);
+    }
+
+    /* old → new. Plain inline flow (not flex) so a long value simply wraps
+       across lines instead of overflowing the screen edge — the values are the
+       point of the sheet, so they must never be clipped. */
+    .ma-vals {
+        margin-top: 4px;
+        font-size: 14px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+    .ma-old { color: var(--text-muted, #999); text-decoration: line-through; }
+    .ma-arrow { color: var(--text-muted, #bbb); margin: 0 5px; }
+    .ma-new { color: var(--text, #333); font-weight: 500; }
+
+    .ma-who {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--text-muted, #888);
+    }
+
+    /* ====================================================================
+       LAYER 11 — Time entries sheet. The desktop panel is a nested card
+       whose add-form (minutes + notes + Add) sits on one row that runs off a
+       phone screen, with 13px inputs that trigger the iOS focus-zoom, and
+       entry rows that cram spent / analyst / date / delete onto a single line
+       so names and dates wrap mid-word. Reflow all three for mobile.
+       ==================================================================== */
+
+    /* Strip the nested-card chrome — the sheet is already the panel. */
+    .mobile-sheet-time .time-entries-section {
+        padding: 0;
+        margin-top: 0;
+        background: none;
+        box-shadow: none;
+        border-radius: 0;
+    }
+
+    /* Add-form: minutes + notes share the top row, the Add button drops to its
+       own full-width row beneath so nothing runs off the edge. 16px inputs are
+       REQUIRED (not cosmetic) — iOS auto-zooms any field under 16px on focus,
+       which then reflows this fixed sheet to a desktop width. */
+    .mobile-sheet-time .time-entry-form { flex-wrap: wrap; }
+    .mobile-sheet-time .time-entry-input-minutes { width: 90px; font-size: 16px; }
+    .mobile-sheet-time .time-entry-input-notes { font-size: 16px; }
+    .mobile-sheet-time .time-entry-add-btn {
+        flex-basis: 100%;
+        padding: 11px;
+        font-size: 15px;
+    }
+
+    /* Entry row: spent + analyst + delete on the top line (delete pushed to the
+       right), the date on its own line beneath, so nothing wraps mid-word. */
+    .mobile-sheet-time .time-entry-row { flex-wrap: wrap; }
+    .mobile-sheet-time .time-entry-analyst { margin-right: auto; }
+    .mobile-sheet-time .time-entry-delete { order: 1; }
+    .mobile-sheet-time .time-entry-date {
+        order: 2;
+        flex-basis: 100%;
+        margin-left: 0;
+        margin-top: 2px;
+        padding-right: 0;
+    }
+
+    /* ====================================================================
+       LAYER 12 — Horizontal scroll for wide email content. External email
+       HTML (fixed-width tables, wide images) renders as its author intended
+       inside a shadow root, so it can be wider than a phone screen. Desktop
+       clips it (overflow:hidden on the host) so it can't overlap the panels
+       below; on a phone that left wide content spilling off the right with
+       no way to reach it. Turn each message body into its own horizontal
+       scroll container, so you can swipe sideways WITHIN a message to see
+       the rest — the isolated email CSS is untouched (this is the light-DOM
+       host, outside the shadow), the whole thread and the page never scroll
+       sideways, and FreeITSM replies that already wrap have nothing to
+       scroll. overflow-y stays hidden (inherited from the desktop rule), so
+       vertical containment is preserved.
+       ==================================================================== */
+    .email-body-content,
+    .thread-message-body {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;   /* momentum scroll on iOS */
+        overscroll-behavior-x: contain;      /* don't chain to page / back-nav */
+    }
+
+    /* ====================================================================
+       LAYER 13 — Affected objects (CMDB) sheet. Same nested-card chrome as
+       the others, plus a 13px picker input that trips the iOS focus-zoom, a
+       lift-on-hover that sticks after a tap on touch, and cards authored in
+       hardcoded light pinks that glare (and wash out the name) in dark mode.
+       ==================================================================== */
+
+    /* Strip the nested-card chrome — the sheet is the panel. */
+    .mobile-sheet-cmdb .cmdb-section {
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        margin: 0;
+        background: none;
+    }
+
+    /* 16px search input — iOS zooms any field under 16px on focus, which then
+       reflows this fixed sheet to a desktop width. */
+    .mobile-sheet-cmdb .cmdb-picker input { font-size: 16px; padding: 10px 12px; }
+
+    /* The sheet's own "Objects" title already labels this, so drop the panel's
+       duplicate "Affected objects" heading — leaving the head as just the
+       action button. */
+    .mobile-sheet-cmdb .cmdb-section-head h3 { display: none; }
+
+    /* "+ Link object" as a proper finger-friendly pill instead of a bare text
+       link (which is a tiny tap target on a phone). */
+    .mobile-sheet-cmdb .cmdb-section-head { align-items: center; gap: 10px; justify-content: flex-start; }
+    .mobile-sheet-cmdb .cmdb-section-head .btn-link {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        padding: 8px 16px;
+        border: 1px solid #f9a8d4;
+        border-radius: 8px;
+        background: #fdf2f8;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .mobile-sheet-cmdb .cmdb-section-head .btn-link:hover { text-decoration: none; }
+    [data-theme="dark"] .mobile-sheet-cmdb .cmdb-section-head .btn-link {
+        background: #2f2430;
+        border-color: #6b3d54;
+    }
+
+    /* No lift-on-hover on touch — :hover sticks after a tap and reads as jank.
+       Roomier tap targets on the cards and the search results. */
+    .mobile-sheet-cmdb .cmdb-link-card { padding: 12px; }
+    .mobile-sheet-cmdb .cmdb-link-card:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    .mobile-sheet-cmdb .cmdb-picker-result { padding: 11px 12px; font-size: 14px; }
+    .mobile-sheet-cmdb .cmdb-picker-results { max-height: 260px; }
+
+    /* Dark mode: the cards are authored in light pinks that glare in a dark
+       sheet and wash out the object name — remap to a dark magenta-tinted
+       surface with a lifted (lighter) pink accent so text stays legible.
+       Scoped to the sheet, so desktop is untouched. */
+    [data-theme="dark"] .mobile-sheet-cmdb .cmdb-link-card {
+        background: #271e25;
+        border-color: #45293a;
+    }
+    [data-theme="dark"] .mobile-sheet-cmdb .cmdb-class-badge {
+        background: #2f2430;
+        border-color: #6b3d54;
+        color: #f0a6cd;
+    }
+    [data-theme="dark"] .mobile-sheet-cmdb .cmdb-section-head h3,
+    [data-theme="dark"] .mobile-sheet-cmdb .cmdb-section-head .btn-link {
+        color: #f472b6;
+    }
+    [data-theme="dark"] .mobile-sheet-cmdb .cmdb-picker-result.highlighted {
+        background: #2f2430;
+        color: #f472b6;
+    }
+
+    /* ====================================================================
+       LAYER 14 — ASSETS module (#936)
+       The second module brought along after Tickets. Same techniques, same
+       hard rule: everything here is inside the one @media block, so the
+       desktop two-pane split is byte-identical.
+
+       Assets is SIMPLER than the inbox — two panes, not three (list and
+       detail; there is no folder tree) — so the stack has two states rather
+       than three and needs no Folders button.
+       ==================================================================== */
+
+    /* The pane area fills what's left under the (possibly wrapped) header and
+       the injected sub-bar. Same column-flex body as LAYER 2 — that rule is
+       shared, not repeated. */
+    .assets-container {
+        height: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .assets-container > .assets-list-container,
+    .assets-container > .asset-detail-container {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        max-width: none;
+        min-width: 0;                    /* desktop sets min-width:300px */
+        border-right: none;
+        transition: transform 0.25s ease;
+    }
+
+    /* Default = the list; the detail is parked off to the right. */
+    .assets-container > .assets-list-container { transform: translateX(0);    z-index: 1; }
+    .assets-container > .asset-detail-container { transform: translateX(100%); z-index: 3; }
+
+    body[data-mobile-pane="detail"] .assets-container > .assets-list-container  { transform: translateX(-100%); }
+    body[data-mobile-pane="detail"] .assets-container > .asset-detail-container { transform: translateX(0); }
+
+    /* ---- The list ---- */
+
+    /* 16px stops iOS zooming the page when the search box takes focus — and a
+       zoomed page reflows to desktop width, at which point none of these rules
+       match any more (the trap in Mobile-Friendly-Techniques §3). */
+    .assets-list-container .search-box { font-size: 16px; min-height: 44px; }
+
+    .asset-item { padding: 14px 15px; }          /* a thumb, not a mouse */
+    .asset-hostname { font-size: 15px; }
+
+    /* Count + Assign-tags sit on one row; give the link a real tap height
+       rather than leaving it a 12px text target. */
+    .assets-tag-link { padding: 6px 0; }
+
+    /* Batch-select bar: buttons get their own row so they stay tappable. */
+    .asset-select-bar { flex-direction: column; align-items: stretch; }
+    .asset-select-actions button { min-height: 42px; flex: 1; }
+
+    /* ---- The detail pane ---- */
+
+    .asset-detail-sticky { padding-left: 14px; padding-right: 14px; }
+    .asset-detail-body   { padding-left: 14px; padding-right: 14px; }
+    .asset-detail-hostname { font-size: 19px; word-break: break-word; }
+
+    /* The action buttons (History / Custody / Print label) wrap instead of
+       running off the side. */
+    .asset-detail-header > div { display: flex; flex-wrap: wrap; gap: 6px; }
+    .asset-detail-header .btn-sm { min-height: 38px; }
+
+    /* Tabs scroll sideways rather than squashing. */
+    .detail-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+    }
+    .detail-tabs::-webkit-scrollbar { display: none; }
+    .detail-tab { white-space: nowrap; flex: 0 0 auto; }
+
+    /* The 4-column info grid becomes one column: at 360px, four columns of
+       label+value is unreadable and two still truncates the values. */
+    .asset-info-grid { grid-template-columns: 1fr !important; gap: 12px; }
+
+    /* Every editable field in the detail pane: 16px (anti-zoom, as above) and a
+       real touch height. */
+    .asset-info-grid .info-value-select,
+    .asset-info-grid .info-value-input {
+        font-size: 16px;
+        min-height: 44px;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Native date inputs ignore width:100% and use their intrinsic width unless
+       the appearance is reset — the #767 spill, same fix. */
+    .asset-info-grid input[type="date"] {
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    /* The assigned-user bar stacks rather than squeezing the button. */
+    .asset-assigned-bar { flex-wrap: wrap; gap: 8px; }
+
+
+    /* ====================================================================
+       LAYER 15 — ASSETS round 2 (#937)
+
+       Round 1 brought the list and the detail pane along. What was left was
+       everything WIDE: the Devices and Software tabs, the History and Custody
+       trails, and the module's three flat pages (table view, dashboard,
+       settings) plus the Servers view — none of which had been touched, so a
+       phone got the desktop layout at desktop widths.
+
+       Two techniques do most of the work here, and which one applies depends
+       on whether the columns are known:
+
+         - Columns we KNOW (Devices, Software, History, Custody) stop being a
+           table at all and become a card feed. Nothing can spill, because
+           nothing is laid out side by side.
+         - Columns we DON'T know (the table view's user-chosen column set, the
+           servers table) keep the table and get a CONTAINED horizontal
+           scroller — the LAYER 12 pattern. The table scrolls inside its
+           wrapper; the page itself never widens.
+
+       Both exist to dodge the same trap: a table that spills off-screen makes
+       iOS Safari reflow the page to desktop width, at which point this entire
+       @media block stops matching and the mobile layout vanishes
+       (Mobile-Friendly-Techniques §3 — the same bug as the #855 audit table).
+       ==================================================================== */
+
+    /* --------------------------------------------------------------------
+       15a — Devices and Software tabs: tables become card feeds.
+
+       Four columns (Devices) and three (Software) of free text do not fit
+       360px. No CSS-generated column labels here: they would have to be
+       hardcoded English and this module is translated, so the reading order
+       carries the meaning instead — name first and prominent, supporting
+       values beneath it.
+       -------------------------------------------------------------------- */
+    .devices-table,
+    .devices-table tbody,
+    .software-table,
+    .software-table tbody { display: block; width: 100%; }
+
+    .devices-table thead,
+    .software-table thead { display: none; }
+
+    .devices-table tbody tr,
+    .software-table tbody tr {
+        display: block;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--surface-hover, #f0f0f0);
+    }
+
+    .devices-table tbody td,
+    .software-table tbody td {
+        display: inline;
+        padding: 0 !important;    /* the devices renderer inlines padding-left:36px */
+        border: none;
+        font-size: 13px;
+        color: var(--text-muted, #666);
+    }
+
+    /* The name is the card's heading. */
+    .devices-table tbody td:first-child,
+    .software-table tbody td:first-child {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text, #333);
+        word-break: break-word;
+    }
+
+    /* Manufacturer · driver version, publisher · version: one line, separated
+       rather than stacked — two short values don't each need a row. */
+    .devices-table tbody td:nth-child(3)::before,
+    .software-table tbody td:nth-child(3)::before { content: " · "; }
+
+    /* The device status badge gets its own line rather than being lost at the
+       end of a sentence. */
+    .devices-table tbody td:nth-child(4) { display: block; margin-top: 5px; }
+    /* …but when there is no status the renderer emits a bare "-", which on its
+       own line reads as a stray dash. Drop the line entirely in that case. If a
+       browser doesn't understand :has() it ignores this rule and shows the dash,
+       which is exactly what it would have shown anyway. */
+    .devices-table tbody td:nth-child(4):not(:has(.device-status)) { display: none; }
+
+    /* The device-class grouping row is a heading, not a card: full-bleed and
+       shaded, the same treatment as the audit sheet's day headings (LAYER 10).
+       It has to out-specify the :first-child heading rule above, hence the
+       table prefix — it is otherwise the same weight and would lose. */
+    .devices-table tbody tr.device-class-row { padding: 0; border-bottom: none; }
+    .devices-table tbody tr.device-class-row td {
+        display: block;
+        margin: 0;
+        padding: 8px 14px !important;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted, #555);
+        background: var(--surface-3, #f8f9fa);
+        border-bottom: 1px solid var(--border, #e0e0e0);
+    }
+
+    /* The tab's own filter controls: 16px (anti-zoom, as everywhere) and the
+       software sub-tabs scroll rather than squash. */
+    .devices-search { padding: 10px 14px; }
+    .devices-search input { font-size: 16px; min-height: 44px; }
+
+    .sw-filter-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+    }
+    .sw-filter-tabs::-webkit-scrollbar { display: none; }
+    .sw-filter-tab { white-space: nowrap; flex: 0 0 auto; }
+
+    /* --------------------------------------------------------------------
+       15b — History and Custody trails: the same card feed.
+
+       Both render `.history-table`, but with different columns (4 and 5), so
+       nothing here may depend on a column INDEX. It keys on the renderers'
+       own `.history-meta` class instead: the small print (date, due-back,
+       analyst) goes inline and small, everything else is a block.
+
+       These live in modals, which LAYER 3 already promotes to full-screen
+       sheets — but a full-screen sheet containing a 5-column table still
+       spills, which is exactly how the #855 audit bug worked. The table had
+       to stop being wide; the sheet was never the problem.
+       -------------------------------------------------------------------- */
+    .history-table,
+    .history-table tbody { display: block; width: 100%; }
+    .history-table thead { display: none; }
+
+    .history-table tbody tr {
+        display: block;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--surface-hover, #f0f0f0);
+    }
+    .history-table tbody td {
+        display: block;
+        padding: 2px 0;
+        border: none;
+    }
+    /* Adjacent small-print cells share a line; a block cell between them (the
+       badge, the user) breaks it, which is what puts date on its own row and
+       pairs due-back with analyst. */
+    .history-table tbody td.history-meta {
+        display: inline-block;
+        margin-right: 12px;
+        font-size: 12px;
+    }
+    .history-value-old,
+    .history-value-new { word-break: break-word; }
+
+    /* --------------------------------------------------------------------
+       15c — The full-screen table view (table.php).
+
+       This one keeps its table. The columns are user-chosen and their labels
+       live in the header row, so card-ifying would leave a stack of values
+       with nothing to say what they are. A contained horizontal scroller is
+       the honest answer: rows stay readable, the phone swipes sideways, and
+       the page itself never widens.
+
+       These rules are named for the shared data-table engine rather than for
+       Assets, so any other module's table view inherits them the moment it
+       links this file.
+       -------------------------------------------------------------------- */
+    /* width/min-width pin it against the flex-item minimum-size growth
+       described under 15e — cheap insurance on every flat page. */
+    .dt-page { height: auto; flex: 1 1 auto; min-height: 0; width: 100%; min-width: 0; }
+
+    .dt-toolbar { padding: 8px 10px; gap: 8px; }
+    .dt-toolbar .dt-search {
+        flex: 1 1 100%;
+        max-width: none;
+        font-size: 16px;
+        min-height: 42px;
+    }
+    .dt-toolbar .dt-btn { min-height: 38px; flex: 1; justify-content: center; }
+    .dt-toolbar .dt-count { flex-basis: 100%; margin-left: 0; }
+
+    .dt-wrap {
+        margin: 8px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+    /* Let the table take the width it needs INSIDE the scroller instead of
+       cramming every column into 360px — one word per line is not a table. */
+    .dt-table thead th,
+    .dt-table tbody td { white-space: nowrap; }
+    .dt-table tbody td { padding: 10px 8px; }
+
+    /* The column and filter popovers are desktop-anchored boxes; cap them so
+       they can't hang off the side of the screen. */
+    .dt-pop { max-width: calc(100vw - 20px); }
+    .dt-pop input, .dt-pop select { font-size: 16px; }
+
+    /* --------------------------------------------------------------------
+       15d — The dashboard.
+       -------------------------------------------------------------------- */
+    .dashboard-page { height: auto; flex: 1 1 auto; min-height: 0; width: 100%; min-width: 0; }
+
+    .dashboard-toolbar { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+    .dashboard-toolbar h2 { font-size: 17px; }
+    .dashboard-toolbar-actions { flex: 1 1 100%; }
+    .dashboard-toolbar-actions .btn { flex: 1; justify-content: center; min-height: 40px; }
+
+    /* Two charts side by side at 360px are two unreadable charts. */
+    .widget-grid { grid-template-columns: 1fr; gap: 14px; padding: 14px; }
+    .widget-header { padding: 14px 14px 0 14px; }
+    .widget-filter { padding: 8px 14px; }
+    .widget-filter select { font-size: 16px; min-height: 40px; }
+    .widget-chart { padding: 8px 10px 12px 10px; min-height: 210px; }
+    .widget-chart canvas { max-height: 230px; }
+
+    /* --------------------------------------------------------------------
+       15e — The settings page.
+
+       Scoped to body[data-mobile-page="settings"] because `.container` is far
+       too common a class name to style globally — the marker attribute is set
+       on the page itself, so only pages that ask for this get it. Other
+       modules' settings pages can opt in the same way.
+       -------------------------------------------------------------------- */
+    /* ---- pages that already own their layout shell (#1005) ----
+       LAYER 2 makes `<body>` a `100dvh` flex column, which is how most pages
+       get a scroll region. The tickets settings page must NOT have that, and
+       its own stylesheet says why in as many words: a flex `<body>` turned
+       extension-injected nodes (LastPass and friends) into flex items and
+       wrecked the layout, so the page builds the same structure one level
+       down in a `.settings-shell` wrapper instead — which does the identical
+       job. Opting it in without this would have re-created a bug somebody had
+       already hit, diagnosed and written a comment about.
+
+       The marker is explicit rather than `body:has(.settings-shell)` so it
+       cannot silently stop matching, and so the intent is greppable from the
+       page. `100dvh` on the shell is the one thing it does want from mobile:
+       `100vh` is wrong the moment a mobile browser shows its chrome. */
+    body[data-mobile-shell="own"] {
+        display: block;
+        height: auto;
+    }
+    .settings-shell { height: 100dvh; }
+
+    body[data-mobile-page="settings"] .container {
+        height: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        /* Tighter at the top than the sides: the tab strip is the first thing
+           under the app bar, and the desktop 14px reads as a seam rather than
+           breathing room. 4px (#1004) turned out to be a shade too tight on a
+           device — 8px is Ed's "ever so slightly more" (#1006). The sides keep
+           their 14px. */
+        padding: 8px 14px 14px;
+        /* LAYER 2 makes <body> a flex column, and a flex item's automatic
+           minimum size is its CONTENT width — so a wide tab strip inside this
+           container stretched the container itself to 776px at a 360px
+           viewport (measured), taking the whole page with it. Pinning the
+           width is what actually contains the overflow; the scrollers below
+           only work once their parent has stopped growing. */
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    /* The shared settings tab bar (renderSettingsTabBar emits `.tabs`/`.tab`)
+       has more tabs than fit — scroll it sideways rather than wrap it into a
+       four-line block that pushes the content off the screen. */
+    body[data-mobile-page="settings"] .tabs {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    body[data-mobile-page="settings"] .tabs::-webkit-scrollbar { display: none; }
+    body[data-mobile-page="settings"] .tab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        min-height: 42px;
+    }
+
+    /* ---- inline multi-column grids stack (#1005) ----
+       Tickets settings lays several forms out with an INLINE
+       `style="display:grid;grid-template-columns:1fr 1fr"` (nine of them; no
+       other settings page has any). At 360px that is two ~150px columns, and
+       a radio group headed "When a ticket's priority changes mid-flight"
+       wraps to five lines inside one. Nothing overflows, so every
+       measurement passed — this is the "contained but crushed" failure again,
+       and it took looking at the page to see it.
+
+       The attribute-substring selector is deliberately blunt: it says "any
+       inline grid on a settings page is one column on a phone", which is the
+       actual intent and covers the ones nobody has written yet. `!important`
+       because an inline style beats any ordinary rule. */
+    body[data-mobile-page="settings"] [style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+    /* ⚠️ Stacking the grid is only half of it. 35 children carry an inline
+       `grid-column: span 2`, and a child spanning two columns of a ONE-column
+       grid makes the browser create an IMPLICIT second column — so the form
+       stayed two-up, with unequal tracks (measured: 93px + 111px), and the
+       rule above looked like it had simply failed. It hadn't; the span was
+       re-creating the column behind it. Both have to go. */
+    body[data-mobile-page="settings"] [style*="grid-column"] {
+        grid-column: auto !important;
+    }
+
+    /* ---- the tab card's own padding (#1006) ----
+       `.tab-content` in inbox.css is a card with `padding: 30px`. On a 360px
+       screen that is 60px of the width — a sixth of it — spent on inset
+       before any content, and it applies to every settings screen in the
+       product because the class is shared. 14px matches the container's own
+       side padding, so the card's contents line up with everything outside
+       it rather than stepping in twice. */
+    body[data-mobile-page="settings"] .tab-content { padding: 14px; }
+
+    body[data-mobile-page="settings"] .settings-section { margin-bottom: 14px; }
+    body[data-mobile-page="settings"] .settings-section-header { padding: 14px; }
+    body[data-mobile-page="settings"] .settings-section-body { padding: 14px; }
+
+    /* ---- Anti-zoom on EVERY field, and buttons wide enough for a thumb ----
+       Rewritten in #1005. The old version listed six input types and missed
+       whatever wasn't on the list — tickets settings turned up a
+       `datetime-local` sitting at the browser default of 13.3px. `:not()` on
+       the types that must keep their native size is the right way round:
+       a new input type is then covered by default instead of forgotten.
+
+       ⚠️ `!important` on the font-size, and this one is earned. Fields in
+       this codebase carry INLINE styles (`<select id="rcTone" style="…
+       font-size: 14px">`), and an inline style beats any ordinary author
+       rule however specific. Losing here is not cosmetic: under 16px iOS
+       zooms on focus, the layout spills wide, Safari reflows the page to
+       desktop width and the entire mobile block switches off. Same failure
+       the #999 specificity bug caused, reached by a different route.
+       min-height stays un-important so a page can still size a field. */
+    body[data-mobile-page="settings"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):not([type="color"]),
+    body[data-mobile-page="settings"] select,
+    body[data-mobile-page="settings"] textarea,
+    body[data-mobile-page="settings"] .form-input,
+    body[data-mobile-page="settings"] .form-select,
+    body[data-mobile-page="settings"] .form-textarea {
+        font-size: 16px !important;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    body[data-mobile-page="settings"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):not([type="color"]),
+    body[data-mobile-page="settings"] select,
+    body[data-mobile-page="settings"] .form-input,
+    body[data-mobile-page="settings"] .form-select {
+        min-height: 44px;
+    }
+    /* Native date/time pickers take an intrinsic width from iOS that ignores
+       width:100% and spills off the right — the #767 reset, applied here too. */
+    body[data-mobile-page="settings"] input[type="date"],
+    body[data-mobile-page="settings"] input[type="time"],
+    body[data-mobile-page="settings"] input[type="datetime-local"] {
+        -webkit-appearance: none;
+        appearance: none;
+        min-width: 0;
+    }
+    body[data-mobile-page="settings"] .btn { min-height: 42px; }
+
+    /* ---- EVERY table on a settings screen scrolls sideways ----
+       One rule, deliberately blunt (#1005). It started as
+       `.settings-section-body table`, gained `.tab-content > table` when
+       service-status showed that half the pages don't use a section body
+       (#1003), and lost its `.lookup-table` exclusion when the Calendar's
+       card feed was dropped for consistency (#1004). Tickets settings then
+       arrived with 18 tables, some inside a `.settings-group` and one inside
+       an inline-styled scroll wrapper — a third structural variant.
+
+       At that point enumerating containers is losing to the codebase. Every
+       table on a settings page is a DATA table (all 18 on tickets carry a
+       `<thead>`; none is used for layout), and Ed's rule is that they should
+       all behave the same, so the selector is simply "a table on a settings
+       page". Anything nested anywhere is covered, including the next variant
+       nobody has written yet.
+
+       A scroller and not a card feed: these are config tables whose columns
+       include unlabelled booleans (Resolved? Default?). Reading order can
+       carry three or four self-describing values; it cannot carry seven, so
+       they keep their header row. */
+    body[data-mobile-page="settings"] table {
+        display: block;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+    /* --------------------------------------------------------------------
+       15f — The Servers view.
+
+       .servers-container is ALSO .main-container, so LAYER 2 has already given
+       it overflow:hidden for the pane stack — which this page doesn't have and
+       which would leave it unscrollable. Putting the scroll back is the first
+       rule here for that reason.
+       -------------------------------------------------------------------- */
+    .servers-container { overflow-y: auto; overflow-x: hidden; }
+    .servers-content { padding: 12px; }
+
+    /* Eight summary cards go two-up rather than auto-fitting to one giant
+       column of eight. */
+    .summary-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+    .servers-toolbar { flex-wrap: wrap; gap: 10px; }
+    .servers-toolbar .search-box {
+        flex: 1 1 100%;
+        max-width: none;
+        font-size: 16px;
+        min-height: 44px;
+    }
+    .filter-chips {
+        flex: 1 1 100%;
+        margin-left: 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .filter-chips::-webkit-scrollbar { display: none; }
+    .filter-chip { flex: 0 0 auto; min-height: 34px; display: inline-flex; align-items: center; }
+
+    /* Unknown-width inventory columns: contained scroller, as 15c. */
+    .servers-table-wrapper {
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+    .servers-table th,
+    .servers-table td { white-space: nowrap; }
+
+    /* The server detail modal is hand-rolled (.detail-overlay/.detail-modal),
+       not a `.modal-content`, so LAYER 3 doesn't reach it — promote it to a
+       full-screen sheet here in the same way. */
+    .detail-overlay { padding: 0; }
+    .detail-modal {
+        max-width: none;
+        max-height: none;
+        height: 100dvh;
+        border-radius: 0;
+    }
+    .detail-header { padding: 14px; }
+    .detail-body { padding: 14px; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .detail-disks-table,
+    .detail-nics-table {
+        display: block;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        white-space: nowrap;
+    }
+    .raw-json { font-size: 11px; overflow-x: auto; }
+
+    /* ====================================================================
+       LAYER 16 — CALENDAR module (#998)
+
+       The third module brought along. Nothing here is a pane stack: a calendar
+       is a single surface, so the mobile job is (a) get the 250px sidebar out
+       of a 360px screen, (b) stop the two grids being wider than the phone —
+       a month row of text pills and a seven-column week grid are both the
+       classic reflow-to-desktop trap — and (c) make the quick-view popup and
+       the event form usable with a thumb.
+
+       ⚠️ `.calendar-header` is TWO different elements: the module header bar
+       (includes/header.php: `<div class="header calendar-header">`) and the
+       calendar's own nav strip inside `.calendar-main`. Everything below that
+       means the nav strip is scoped `.calendar-main .calendar-header` — an
+       unscoped rule restyles the app header on every calendar page.
+       -------------------------------------------------------------------- */
+
+    /* --------------------------------------------------------------------
+       16a — Page shell.
+
+       Desktop is a flex ROW: a fixed 250px sidebar beside the calendar, in a
+       `height: calc(100vh - 60px)` box. At 360px that leaves ~110px for the
+       calendar itself, and the calc() is wrong the moment the header wraps to
+       two lines. Column flex + the LAYER 2 body handles both; the width pin is
+       the #937 lesson — a flex item's automatic minimum size is its CONTENT
+       width, so the parent must be contained before any child scroller works.
+       -------------------------------------------------------------------- */
+    .calendar-container {
+        flex-direction: column;
+        gap: 0;
+        padding: 0;
+        height: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    /* The sidebar is RELOCATED into a sheet by mobile.js, so this only hides
+       the empty shell if that JS hasn't run (or the node was left behind). */
+    .calendar-container > .calendar-sidebar { display: none; }
+    /* Full-bleed: a rounded card with a shadow inside a screen-sized page is
+       chrome for chrome's sake once there's nothing beside it. */
+    .calendar-main {
+        border-radius: 0;
+        box-shadow: none;
+        min-height: 0;
+        min-width: 0;
+    }
+
+    /* The nav strip: title + prev/next/today on one row, the view toggle on a
+       full-width row of its own. Title first via `order` so it reads
+       left-to-right like a heading, with the controls trailing it. */
+    .calendar-main .calendar-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 10px 12px;
+    }
+    .calendar-main .calendar-nav { gap: 6px; }
+    .calendar-main .calendar-title {
+        order: -1;
+        flex: 1 1 auto;
+        min-width: 0;
+        margin: 0;
+        font-size: 16px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .calendar-main .calendar-nav .btn {
+        min-height: 36px;
+        padding: 7px 12px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+    .calendar-main .btn-icon { width: 36px; height: 36px; padding: 0; flex-shrink: 0; }
+    /* Three equal thumb-sized view buttons across the full width. */
+    .calendar-main .view-toggle { width: 100%; }
+    .calendar-main .view-btn { flex: 1; padding: 10px 4px; font-size: 13px; min-height: 40px; }
+
+    /* --------------------------------------------------------------------
+       16b — Month view: dots, not pills.
+
+       Seven columns of a 360px screen is a ~50px cell. A text pill there is an
+       ellipsis, and six rows of them is also the widest thing on the page —
+       which is what detonates the media query (see the Techniques wiki, §3).
+       So the month grid keeps its shape and loses its text: each event becomes
+       a category-coloured dot, and the DAY is the tap target (mobile.js opens
+       an agenda sheet for it). This is the phone-calendar convention, and it
+       keeps the one thing a month grid is for — seeing which days are busy.
+       -------------------------------------------------------------------- */
+    .month-day {
+        min-height: 54px;
+        padding: 3px 2px;
+        align-items: center;
+    }
+    /* A lift/tint on :hover STICKS after a tap on a touchscreen and reads as a
+       stuck selection. Kill it on every calendar hover affordance. */
+    .month-day:hover,
+    .week-time-slot:hover,
+    .day-time-slot:hover { background: none; }
+    .event-pill:hover,
+    .week-event:hover,
+    .day-event:hover,
+    .all-day-event:hover { opacity: 1; }
+
+    .day-number {
+        font-size: 12px;
+        padding: 2px;
+        margin-bottom: 3px;
+        text-align: center;
+    }
+    .month-day.today .day-number { width: 24px; height: 24px; font-size: 12px; }
+
+    .day-events {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-content: flex-start;
+        align-items: center;
+        gap: 3px;
+        width: 100%;
+    }
+    /* The pill keeps its inline background-color (the category colour) and
+       loses everything else. text-indent pushes the title out of the box
+       rather than hiding it, so it stays in the accessibility tree.
+       pointer-events:none is deliberate: a 7px dot is not a tap target, so the
+       tap falls through to the day cell and opens the agenda instead. */
+    .event-pill {
+        width: 7px;
+        height: 7px;
+        flex: 0 0 auto;
+        padding: 0;
+        border-radius: 50%;
+        overflow: hidden;
+        text-indent: -999px;
+        pointer-events: none;
+    }
+    .more-events {
+        font-size: 9px;
+        line-height: 7px;
+        padding: 0;
+        pointer-events: none;
+    }
+
+    /* --------------------------------------------------------------------
+       16c — Week view: a contained horizontal scroller.
+
+       A time gutter plus seven day columns cannot be made to fit 360px and
+       still mean anything — squeezed to 43px each they're unreadable, and left
+       loose they take the whole media query down with them. So it becomes the
+       LAYER 12 move: give the grid an honest minimum width and let it scroll
+       INSIDE `.calendar-grid`. Header and body share that one scroll container,
+       so the day columns stay aligned with the hours beneath them (two
+       separate scrollers would drift apart).
+       -------------------------------------------------------------------- */
+    .calendar-grid { overflow-x: auto; overscroll-behavior-x: contain; }
+    .week-grid { min-width: 620px; }
+    /* Desktop reserves a 17px scrollbar gutter on the header so its columns
+       line up with the scrolling body. Mobile scrollbars are overlays with no
+       width, so that reservation becomes a 17px misalignment. */
+    .week-header { overflow-y: hidden; }
+    .week-body::-webkit-scrollbar,
+    .day-body::-webkit-scrollbar { width: 0; }
+    .week-day-number { font-size: 17px; }
+    .week-header-day.today .week-day-number { width: 30px; height: 30px; }
+
+    /* --------------------------------------------------------------------
+       16d — Day view. Already one column, so this is only density: the header
+       block is desktop-roomy and the events want a thumb-sized body.
+       -------------------------------------------------------------------- */
+    .day-header { padding: 10px 12px; }
+    .day-header-date { font-size: 24px; }
+    .day-header-weekday { font-size: 13px; }
+    .all-day-section { padding: 8px 12px; }
+    .day-event { padding: 8px 10px; }
+
+    /* --------------------------------------------------------------------
+       16e — The event quick-view popup becomes a bottom sheet.
+
+       `showEventPopup()` positions it at the click coordinates with inline
+       `top`/`left` — meaningless on a phone, and a 300px box positioned from a
+       tap near the right edge hangs off the screen. Author `!important` beats
+       inline styles, so the popup is re-anchored to the bottom of the screen
+       with no JS wrap at all. z-index clears the agenda sheet (1500) it is
+       usually opened from.
+       -------------------------------------------------------------------- */
+    .event-popup {
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: auto !important;
+        max-height: 80dvh;
+        overflow-y: auto;
+        z-index: 1600;
+        border-radius: 14px 14px 0 0;
+        box-shadow: 0 -4px 24px var(--shadow, rgba(0, 0, 0, 0.3));
+    }
+    .event-popup-header { padding: 12px 16px; }
+    .event-popup-close { font-size: 26px; padding: 4px 10px; min-height: 38px; }
+    .event-popup-title { font-size: 18px; padding: 14px 16px 8px; }
+    .event-popup-time,
+    .event-popup-location,
+    .event-popup-description { font-size: 14px; padding: 0 16px 10px; }
+    /* Desktop clamps the description to 60px because the popup floats over the
+       grid; a bottom sheet can scroll, so show the whole thing. */
+    .event-popup-description { max-height: none; }
+    .event-popup-actions { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+    .event-popup-actions .btn { width: 100%; min-height: 44px; font-size: 15px; }
+
+    /* --------------------------------------------------------------------
+       16f — Event + subscribe modals inside the LAYER 3 full-screen sheet.
+
+       LAYER 3 already promotes both to full screen and forces 16px fields, and
+       its date/time `-webkit-appearance` reset (#767) covers the four native
+       pickers here. What it does NOT cover: `.form-row` in this app is a FLEX
+       row, and LAYER 3's stacking rule sets `grid-template-columns`, which is
+       inert on a flex container — so Start date/Start time stayed side by side
+       at ~150px each. Scoped to #eventModal rather than widening the shared
+       rule, so no already-shipped modal changes shape.
+       -------------------------------------------------------------------- */
+    #eventModal .form-row { flex-direction: column; gap: 0; margin-bottom: 0; }
+    #eventModal .form-row .form-group { margin-bottom: 16px; }
+    #eventModal .form-input,
+    #eventModal .form-textarea { min-height: 44px; }
+    #eventModal .form-checkbox { min-height: 44px; font-size: 15px; }
+    #eventModal .form-checkbox input { width: 20px; height: 20px; }
+    /* Delete is `margin-right:auto` on desktop; on one narrow row that leaves
+       three buttons fighting. Give Delete its own full-width row underneath. */
+    #eventModal .modal-footer { flex-wrap: wrap; gap: 10px; }
+    #eventModal .modal-footer .btn { min-height: 44px; }
+    #eventModal .modal-footer-right { flex: 1 1 100%; }
+    #eventModal .modal-footer-right .btn { flex: 1; }
+    #eventModal .modal-footer .btn-danger { order: 2; flex: 1 1 100%; margin-right: 0; }
+
+    /* Subscribe ("Add to your phone") — the one feature here that is ABOUT a
+       phone, so it had better work on one. The URL row is an input beside a
+       Copy button that squeezed the link to a few characters. */
+    .subscribe-modal { max-width: 100% !important; }
+    .subscribe-url-row { flex-wrap: wrap; gap: 10px; }
+    .subscribe-url-row .subscribe-url { flex: 1 1 100%; }
+    .subscribe-url-row .btn { flex: 1 1 100%; min-height: 44px; font-size: 15px; }
+    .subscribe-qr img { max-width: 100%; height: auto; }
+    .subscribe-reset { min-height: 44px; padding: 8px 0; }
+
+    /* --------------------------------------------------------------------
+       16g — The two calendar sheets (built on the LAYER 7 `.mobile-sheet`
+       chrome, so they inherit the header, the blue Close button and the
+       scrolling body).
+
+       `.mobile-sheet-calopts` holds the relocated sidebar (categories +
+       subscribe); `.mobile-sheet-calday` is the agenda for a tapped day.
+       -------------------------------------------------------------------- */
+
+    /* Options sheet: the sidebar's own section cards are nested chrome inside a
+       panel that is already a panel — flatten them (the LAYER 13 move). */
+    .mobile-sheet-calopts .calendar-sidebar { gap: 0; }
+    .mobile-sheet-calopts .sidebar-section {
+        background: none;
+        box-shadow: none;
+        border-radius: 0;
+        padding: 4px 0 18px;
+        border-bottom: 1px solid var(--border-soft, #eee);
+    }
+    .mobile-sheet-calopts .sidebar-section:last-child { border-bottom: none; }
+    /* One heading per sheet: the sheet's own "Categories" title already labels
+       the filter list, so drop the panel's copy of it. Matched via :has() on
+       the list's id rather than :first-child — the "Add to your phone" heading
+       below is NOT a duplicate and has to stay. */
+    .mobile-sheet-calopts .sidebar-section:has(#categoryFilterList) h3 { display: none; }
+    /* Roomier checkbox rows — a 16px checkbox in an 8px row is a miss-tap. */
+    .mobile-sheet-calopts .category-filter-item { padding: 12px 4px; min-height: 46px; }
+    .mobile-sheet-calopts .category-filter-item input[type="checkbox"] { width: 20px; height: 20px; }
+    .mobile-sheet-calopts .category-filter-name { font-size: 15px; }
+    .mobile-sheet-calopts .btn-full { min-height: 44px; font-size: 15px; }
+    /* mobile.js hides the sidebar's own "New event" block — the sub-bar
+       carries it, and two of the same button in one sheet is a wrong turn. */
+    .mobile-sheet-calopts .mc-dup { display: none; }
+
+    /* Agenda sheet: a day's events as a card feed. Rows run edge to edge, so
+       the body drops the LAYER 7 side padding and each row re-inserts it. */
+    .mobile-sheet-calday .ms-body { padding: 0 0 24px; }
+    .mc-ag-empty {
+        padding: 34px 16px;
+        text-align: center;
+        color: var(--text-muted, #666);
+        font-size: 14px;
+    }
+    .mc-ag-item {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        border-bottom: 1px solid var(--border-soft, #eee);
+        padding: 14px 16px;
+        min-height: 56px;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+    }
+    .mc-ag-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-top: 5px;
+        flex-shrink: 0;
+    }
+    .mc-ag-main { flex: 1; min-width: 0; }
+    .mc-ag-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text, #333);
+        overflow-wrap: anywhere;
+    }
+    .mc-ag-time { font-size: 13px; color: var(--text-muted, #666); margin-top: 3px; }
+    .mc-ag-loc {
+        font-size: 13px;
+        color: var(--text-dim, #888);
+        margin-top: 2px;
+        overflow-wrap: anywhere;
+    }
+    .mc-ag-cat { font-size: 12px; color: var(--text-dim, #888); margin-top: 2px; }
+    /* The agenda's own "add here" action, pre-filled with the day you're on. */
+    .mc-ag-new {
+        display: block;
+        width: calc(100% - 32px);
+        margin: 16px;
+        min-height: 46px;
+        padding: 11px 16px;
+        border: none;
+        border-radius: 8px;
+        background: var(--accent, #ef6c00);
+        color: var(--on-accent, #fff);
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    /* --------------------------------------------------------------------
+       16h — The help guide.
+
+       The BODY of every help page is already responsive — that came with the
+       house style (#976), which collapses the sidebar into a horizontal
+       contents strip at 900px. What the page never had is the app SHELL: the
+       header's view links spilled off the right edge because nothing turned
+       them into a drawer. Linking mobile.css/js is most of the fix; these
+       rules are the two things that linking it creates.
+       -------------------------------------------------------------------- */
+
+    /* LAYER 2 makes <body> a flex column with `height: 100dvh`, and flex items
+       SHRINK by default — so a page taller than the screen gets squashed and
+       clipped rather than scrolling. Every opted-in page needs its top-level
+       container turned into the scroller; this is that page's version of the
+       `.container` / `.dt-page` pin. The width pin is the #937 lesson again:
+       the contents strip below is `white-space: nowrap`, and a flex item's
+       automatic minimum size is its CONTENT width. */
+    .help-container {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    /* The contents strip already scrolls sideways (help.css). Hide its
+       scrollbar — it sits directly under the header and reads as a stray rule
+       — and stop the swipe chaining to the page behind it. */
+    .help-sidebar {
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .help-sidebar::-webkit-scrollbar { display: none; }
+    .help-nav-link { min-height: 40px; display: inline-flex; align-items: center; }
+
+    /* --------------------------------------------------------------------
+       16i — Settings: shared chrome for a settings page's own content.
+
+       ⚠️ This block USED to turn `.lookup-table` into a card feed. It no
+       longer does — Ed's call (#1004): every table on every settings screen
+       should behave the same way, and the way they behave is scroll
+       sideways. So the card feed is gone and `.lookup-table` falls through to
+       the one rule in 15e along with everything else, which is why that rule
+       no longer needs its `:not(.lookup-table)` exclusion.
+
+       Worth recording WHY the card feed lost, because the reasoning that
+       built it wasn't wrong: a 4-column table whose columns self-describe is
+       a good card feed in isolation. But settings screens are a SET, and the
+       6- and 7-column config tables next to it can't be cards (unlabelled
+       booleans — Resolved? Default?). One screen behaving differently from
+       its neighbours costs more than the individual screen gains.
+       See [[Consistency over bespoke]].
+       -------------------------------------------------------------------- */
+    body[data-mobile-page="settings"] .section-header { flex-wrap: wrap; gap: 10px; }
+    body[data-mobile-page="settings"] .add-btn { min-height: 40px; padding: 9px 16px; font-size: 14px; }
+
+    /* Thumb-sized row actions inside the (now horizontally scrolling) tables. */
+    body[data-mobile-page="settings"] .action-btn {
+        min-width: 40px;
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* ---- add/edit dialogs: heading aligned with the fields (#1006) ----
+       Settings modals come in two shapes. The canonical one is
+       `.modal-content > .modal-header + .modal-body`, where LAYER 3 gives the
+       header and the body a matching 16px and everything lines up. The other
+       — service-status, assets — has no `.modal-body` at all: the form is a
+       direct child, and the page pads `.modal-content` itself. The header
+       then sits at the content's padding PLUS LAYER 3's own 16px, so "Add
+       service" was indented further than the fields beneath it.
+
+       Normalise instead of special-casing: the content box carries no
+       padding, and the header and the form/body each supply the same inset.
+       `:has()` guards it — a modal with neither a form nor a `.modal-body` to
+       pad keeps its own padding rather than going flush to the edge. */
+    body[data-mobile-page="settings"] .modal-content:has(> form, > .modal-body) {
+        padding: 0 !important;
+    }
+    body[data-mobile-page="settings"] .modal-content > form,
+    body[data-mobile-page="settings"] .modal-content > .modal-body {
+        padding: 16px;
+    }
+    /* The header's inset is stated here rather than left to LAYER 3's plain
+       `.modal-header`, because that rule does not always win: inbox.css:2549
+       carries `.modal-content:has(> .modal-body) > .modal-header` at 24px,
+       which is (0,3,0) and beats it. Only the modals that HAVE a `.modal-body`
+       matched it, so three settings dialogs lined up and the Calendar's sat
+       8px further in — the kind of near-miss that looks like a one-page quirk
+       until you find the selector. Stating both insets in one place is what
+       makes "normalise" actually normalise. */
+    body[data-mobile-page="settings"] .modal-content > .modal-header {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    /* A colour swatch is a tap target on this page (it opens the picker in the
+       modal) and a 22px square is easier to hit than an 18px one. */
+    body[data-mobile-page="settings"] .swatch { width: 22px; height: 22px; }
+    body[data-mobile-page="settings"] .modal input[type="color"] {
+        width: 100%;
+        min-height: 48px;
+        padding: 4px;
+    }
+
+    /* The calendar sub-bar (injected by mobile.js). Reuses `.mobile-subbar`
+       from LAYER 2; the New-event action is the page's primary action, so it
+       gets a filled pill rather than another blue text link. */
+    .mobile-subbar .msb-new {
+        margin-left: auto;
+        background: var(--accent, #ef6c00);
+        color: var(--on-accent, #fff);
+        border-radius: 8px;
+        padding: 8px 14px;
+        min-height: 38px;
+        font-size: 14px;
+    }
+
+    /* ====================================================================
+       LAYER 17 — KNOWLEDGE module (#1000)
+
+       The fourth module. Two things make it different from the first three.
+
+       1. **It needs no pane stack.** `.knowledge-main` already shows exactly
+          one of three views at a time (list / detail / editor), toggled by
+          `showView()` with `display`. So there is nothing to slide — the
+          mobile job is what each view looks like once it has the screen.
+
+       2. **The primary action is SEARCH**, and search lives in the sidebar
+          that has to go. On a phone you come to a knowledge base to find one
+          article, so the search box is RELOCATED into the sub-bar rather than
+          buried in a sheet behind a button. The tag filters, New article and
+          the recycle bin go into the sheet; search does not.
+
+       mobile.js mirrors the current view onto `body[data-kb-view]` so these
+       rules can react to it — the module's own JS carries that state only in
+       three inline `display` values.
+       -------------------------------------------------------------------- */
+
+    /* --------------------------------------------------------------------
+       17a — Page shell.
+       -------------------------------------------------------------------- */
+    .knowledge-container {
+        flex-direction: column;
+        height: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    /* Relocated into the sub-bar + sheet by mobile.js; this hides the shell if
+       that JS hasn't run. `> ` so the copy inside the sheet is unaffected. */
+    .knowledge-container > .knowledge-sidebar { display: none; }
+    .knowledge-main { padding: 12px; min-width: 0; }
+
+    /* The sub-bar carries the real `#articleSearch` input, moved here — so it
+       keeps its id and its `onkeyup="debounceSearch()"`. 16px because it is a
+       focusable field (iOS would zoom and reflow the page otherwise). */
+    .mobile-subbar .search-box { flex: 1; min-width: 0; }
+    .mobile-subbar .search-box input {
+        width: 100%;
+        min-height: 40px;
+        font-size: 16px;
+        box-sizing: border-box;
+    }
+    /* The sub-bar belongs to the LIST. Searching or tag-filtering from inside
+       an article would silently rearrange a list you can't see, and both the
+       detail and editor views already carry their own Back / Cancel. So the
+       whole bar goes away rather than sitting there offering the wrong verbs
+       — which is also one less strip of chrome above the thing you came to
+       read. `!important` beats the inline `display: flex` mobile.js sets. */
+    body[data-kb-view="detail"] .mobile-subbar,
+    body[data-kb-view="editor"] .mobile-subbar { display: none !important; }
+
+    /* --------------------------------------------------------------------
+       17b — The article list.
+       -------------------------------------------------------------------- */
+    .article-list-header { margin-bottom: 12px; gap: 10px; }
+    .article-list-header h2 { font-size: 19px; }
+    .article-list { gap: 10px; }
+    .article-card { padding: 14px; }
+    /* A lift-on-hover sticks after a tap on a touchscreen. */
+    .article-card:hover { transform: none; box-shadow: 0 2px 4px var(--shadow, rgba(0,0,0,0.08)); }
+    .article-card-title { font-size: 16px; padding-right: 40px; }
+    .article-card-preview { font-size: 13px; margin-bottom: 10px; }
+    /* Date and tags side by side at 360px squeeze both; give tags their row. */
+    .article-card-meta { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .article-card-info { gap: 12px; flex-wrap: wrap; }
+    /* The bulk tick is a 13px checkbox in the card corner — a miss-tap that
+       opens the article instead. Widen the hit area, not the tick. */
+    .article-select { top: 8px; right: 8px; padding: 11px; }
+    .article-select input { width: 18px; height: 18px; }
+
+    /* The bulk bar already wraps; it just needs thumb-sized controls. */
+    .kb-bulk-bar { padding: 12px; gap: 8px; }
+    .kb-bulk-bar select { flex: 1 1 100%; min-height: 44px; font-size: 16px; }
+    .kb-bulk-bar .btn { flex: 1; min-height: 40px; }
+
+    /* --------------------------------------------------------------------
+       17c — Reading an article. THE journey this module exists on a phone
+       for, and the one with the widest content in the product.
+
+       An article body is author-written HTML from TinyMCE: it can hold a
+       screenshot at its natural pixel width, a table of firewall rules, a
+       pasted iframe, a code sample. Any one of those is wider than 360px, and
+       a wide thing loose in the layout doesn't just overflow — it reflows the
+       whole page to desktop width and switches the media query off
+       (Techniques §3). `pre` was already an `overflow-x: auto` island;
+       everything else here is the same treatment applied to the rest.
+       -------------------------------------------------------------------- */
+    /* --------------------------------------------------------------------
+       17h — Giving the article the screen.
+
+       Everything above the text is overhead, so it is squeezed onto as few
+       rows as possible: Back joins Share / Edit / Archive on ONE row (its
+       label shortens to just "Back" — mobile.js, using the shared
+       `common.back`), and the four meta lines collapse to one.
+       -------------------------------------------------------------------- */
+    .article-detail-header {
+        display: flex;
+        flex-wrap: nowrap;          /* one row: Back | Share | Edit | Archive */
+        align-items: stretch;
+        gap: 6px;
+        margin: 0 0 10px;
+    }
+    .article-detail-header > .btn {
+        flex: 0 0 auto;             /* Back sizes to its (now short) label */
+        min-height: 42px;
+        padding: 0 12px;
+        display: inline-flex;
+        align-items: center;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+    .article-actions { flex: 1 1 auto; flex-wrap: nowrap; gap: 6px; min-width: 0; }
+    .article-actions .share-dropdown { flex: 1; min-width: 0; }
+    .article-actions .btn {
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 8px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+
+    .article-content { padding: 16px; border-radius: 8px; }
+    .article-content-title { font-size: 22px; line-height: 1.25; }
+
+    /* ---- the Gmail-style collapsible meta ----
+       Collapsed, the header shows the one line that answers "is this still
+       current?" — Modified — plus the tags. Author, Created and Views are a
+       tap away. `.article-content-meta` itself is the tap target (mobile.js
+       gives it role=button / aria-expanded): a whole row is a far better
+       target than a chevron, and it means the accessible name is the visible
+       text rather than a label string that would need translating into 24
+       locales. The chevron is a glyph, not a word, so it needs no locale. */
+    .article-content-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+        font-size: 13px;
+        padding: 4px 0;
+        cursor: pointer;
+    }
+    .article-content-header .kb-meta-by,
+    .article-content-header .kb-meta-created,
+    .article-content-header .kb-meta-views { display: none; }
+    .article-content-header.kb-meta-open .kb-meta-by,
+    .article-content-header.kb-meta-open .kb-meta-created,
+    .article-content-header.kb-meta-open .kb-meta-views { display: block; }
+
+    /* Drawn with borders rather than a ▾ glyph: at 11px the character rendered
+       as a faint dot in the app's font stack, and a chevron that reads as a
+       full stop is not an affordance. Borders are font-independent. */
+    .article-content-meta .kb-meta-modified::after {
+        content: '';
+        display: inline-block;
+        width: 0;
+        height: 0;
+        margin-left: 8px;
+        vertical-align: 2px;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 5px solid var(--text-dim, #888);
+        transition: transform 0.15s ease;
+    }
+    .article-content-header.kb-meta-open .kb-meta-modified::after { transform: rotate(180deg); }
+
+    .article-content-tags { margin-top: 8px; }
+
+    /* ---- the peek-through strip (Ed spotted this on device) ----
+       `knowledge.css:729` makes `.article-content-header` `position: sticky;
+       top: 0` so the title stays put while the body scrolls. A sticky element
+       sticks to the top of its scroll container's CONTENT box — i.e. BELOW
+       that container's padding-top — so the 12px of padding on
+       `.knowledge-main` became a transparent gap between the purple app bar
+       and the pinned title, and the article text scrolled up through it.
+
+       Exactly the trap the audit sheet hit in #855 (Techniques §5), and the
+       fix is the same shape: take the padding off the scroll container so the
+       sticky header tucks flush, and give that space back to something that
+       scrolls away instead — here the button row's own margin. Scoped to the
+       detail view via body[data-kb-view], because the article LIST still
+       wants its top padding. */
+    body[data-kb-view="detail"] .knowledge-main { padding-top: 0; }
+    body[data-kb-view="detail"] .article-detail-header { margin-top: 12px; }
+
+    /* The header's own -20px top margin was cancelling the desktop card's
+       30px padding; on mobile the card is padded 16px, so match it exactly —
+       an over-long negative margin would lift the header clear of the card
+       and re-open a strip of its own. Full-bleed side margins (cancelled by
+       equal padding, so they cannot add width) let the pinned bar reach the
+       card edges rather than floating in the middle of it. */
+    .article-content-header {
+        margin: -16px -16px 16px;
+        padding: 14px 16px;
+    }
+
+    /* Images and media scale to the column instead of setting it. */
+    .article-content-body img,
+    .article-content-body video,
+    .article-content-body iframe,
+    .article-content-body embed {
+        max-width: 100%;
+        height: auto;
+    }
+    /* A table's columns are the author's, not ours, and there is no telling
+       how many — so it stays a table and gets its own scroll box (the LAYER 12
+       / 15c rule). `display: block` is what makes overflow apply to a table. */
+    .article-content-body table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+    /* `nowrap` is doing the real work, not the overflow. Without it a seven-
+       column table doesn't scroll — it CRUSHES, wrapping every cell down to
+       one word per line inside 360px, which is contained and unreadable. The
+       trade is that a cell holding a sentence becomes a long swipe; for the
+       tables people actually put in a runbook (rules, ports, versions) that
+       is the right way round, and it matches 15c and 15f. */
+    .article-content-body th,
+    .article-content-body td { white-space: nowrap; }
+    .article-content-body pre {
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        font-size: 12.5px;
+    }
+    /* A long unbroken string — a URL, a registry path, a hash — is a single
+       word no wrapping algorithm will break by default. */
+    .article-content-body { overflow-wrap: anywhere; }
+    .article-content-body code { overflow-wrap: anywhere; }
+
+    /* Share: an absolutely-positioned dropdown pinned to a button that is now
+       full-width becomes a bottom sheet, the same move as the calendar's
+       quick-view popup (16e). `position: fixed` beats the parent's
+       `position: relative` without touching the JS that opens it. */
+    .share-dropdown { position: static; }
+    .share-dropdown-menu.active {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        margin: 0;
+        border-radius: 14px 14px 0 0;
+        z-index: 1600;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .share-dropdown-menu a { padding: 16px; font-size: 15px; min-height: 52px; }
+
+    /* --------------------------------------------------------------------
+       17d — The editor.
+
+       ⚠️ The landmine here is the same one as the tickets pop-out (#762): a
+       DESKTOP MODE HELD IN localStorage. `applyEditorPopoutFromPref()` reads
+       `knowledge_editor_popout` on every edit and re-applies `.editor-popout`,
+       which turns the form into a `row-reverse` flex with a **fixed 340px**
+       property panel. At 360px that is the entire screen and the editor itself
+       gets nothing. mobile.js strips the class at the source; this is the CSS
+       backstop, because a backstop is what saved the tickets one.
+       -------------------------------------------------------------------- */
+    .knowledge-container.editor-popout .editor-form {
+        display: block;
+        flex-direction: initial;
+    }
+    .knowledge-container.editor-popout .editor-properties {
+        width: auto;
+        flex-shrink: initial;
+        padding: 0;
+        background: none;
+        border: none;
+        overflow-y: visible;
+    }
+    .knowledge-container.editor-popout .editor-content { display: block; }
+    /* The pop-out toggle itself is meaningless on a phone — the editor is
+       already the whole screen — and leaving it would re-arm the pref. */
+    .editor-popout-toggle { display: none; }
+
+    .editor-scroll { padding: 12px; margin: 0; }
+    .editor-header h2 { font-size: 19px; }
+    .editor-form { padding: 14px; }
+    /* Two-up property rows are two unusable fields at 360px. `.form-row` here
+       is FLEX (LAYER 3's grid-stacking rule is inert on it — see 16f). */
+    .editor-form .form-row { flex-direction: column; gap: 0; }
+    .editor-form .form-row > .form-group { margin-bottom: 16px; }
+    .editor-form .form-input,
+    .editor-form .form-select,
+    .editor-form .tag-input,
+    .editor-form input[type="text"],
+    .editor-form input[type="date"],
+    .editor-form select,
+    .editor-form textarea {
+        font-size: 16px;
+        min-height: 44px;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .editor-form input[type="date"] {
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    /* Label and chips share one row on desktop; on a phone the chips need
+       their own, left-aligned under the label. */
+    .tag-label-row { flex-wrap: wrap; gap: 6px; }
+    .selected-tags { justify-content: flex-start; flex: 1 1 100%; }
+    .tag-suggestion { padding: 13px 12px; font-size: 15px; }
+
+    /* The action row is a real footer. It has to reach the actual bottom of
+       the screen — `.knowledge-main`'s 12px padding was holding it a little
+       short of it, and the side padding inset it from both edges, so it read
+       as a floating strip rather than a footer. Same move as the detail
+       view's peek-through fix: take the padding off the scroll container for
+       this view only, and let the parts inside carry their own.
+       env() keeps the buttons clear of the iPhone home indicator. */
+    body[data-kb-view="editor"] .knowledge-main { padding: 0; }
+    .editor-actions {
+        margin: 0;
+        padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .editor-actions .btn { flex: 1 1 auto; min-height: 44px; }
+
+    /* ---- full-screen text editing (Ed's ask) ----
+       Writing an article through a 200px window under six property fields is
+       the worst part of the editor on a phone. A button above the field lifts
+       the content area out to `position: fixed; inset: 0`.
+
+       Deliberately NOT TinyMCE's own `mceFullScreen`: the plugin is loaded,
+       but its only exit is the View menu or a toolbar button that isn't in
+       this init's toolbar, so a phone user could get stuck in it. Ours
+       carries its own Close bar, which is always visible, and the device back
+       button exits too. The `.tox-tinymce { flex: 1; height: auto }` trick is
+       the same one the desktop pop-out already relies on, so the iframe is
+       known to follow its container here. */
+    .kb-fs-open {
+        display: block;
+        width: 100%;
+        min-height: 44px;
+        margin-bottom: 8px;
+        padding: 10px 14px;
+        border: 1px solid var(--border, #ddd);
+        border-radius: 8px;
+        background: var(--surface-2, #f5f5f5);
+        color: var(--text, #333);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .kb-fs-bar { display: none; }
+
+    body.kb-editor-full .editor-content {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        margin: 0;
+        padding: 0;
+        background: var(--surface, #fff);
+        display: flex;
+        flex-direction: column;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    body.kb-editor-full .kb-fs-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-shrink: 0;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border, #ddd);
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text, #333);
+    }
+    /* A long article title must not push Close off the bar. */
+    .kb-fs-title {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    body.kb-editor-full .kb-fs-open { display: none; }
+    body.kb-editor-full .editor-content > .form-group {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        margin: 0;
+    }
+    body.kb-editor-full .editor-content .tox-tinymce {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto !important;      /* beat TinyMCE's inline pixel height */
+        border: none;
+        border-radius: 0;
+    }
+
+    /* ---- reclaiming the editor's own chrome ----
+       Measured on a 360px screen: the menubar wrapped to FOUR rows and an
+       upsell badge sat beside it, together taking ~130px of a 720px screen
+       before a word could be typed.
+
+       The upsell is not a feature, so it goes. The menubar scrolls sideways
+       instead of wrapping — the same move as the settings tab strip — which
+       reclaims the height while keeping every menu reachable; hiding it would
+       have been the easy option and would have taken Table and Format with it.
+
+       ⚠️ These are TinyMCE's own internal class names, so an upgrade could
+       rename them. Both rules are purely cosmetic: if they stop matching, the
+       editor simply looks the way it does today.
+
+       ⚠️ `!important` is not laziness here: TinyMCE injects its skin
+       stylesheet into <head> at RUNTIME, so it always lands after mobile.css
+       and wins every specificity tie on source order alone. Nothing short of
+       !important reaches it. Measured: without it the menubar still wrapped —
+       the first improvement was the promotion badge going, not the nowrap. */
+    .tox-promotion { display: none !important; }
+    .tox .tox-menubar {
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+    .tox .tox-menubar::-webkit-scrollbar { display: none; }
+    .tox .tox-menubar .tox-mbtn { flex: 0 0 auto; }
+
+    /* --------------------------------------------------------------------
+       17e — The tags / actions sheet (LAYER 7 chrome, as 16g).
+       -------------------------------------------------------------------- */
+    .mobile-sheet-kbopts .sidebar-section {
+        padding: 4px 0 16px;
+        border-bottom: 1px solid var(--border-soft, #eee);
+    }
+    .mobile-sheet-kbopts .sidebar-section:last-child { border-bottom: none; }
+    /* The search box is in the sub-bar, so its section in the sheet is dead
+       weight — mobile.js marks it rather than trusting a position. */
+    .mobile-sheet-kbopts .kb-dup { display: none; }
+    /* One heading per sheet: the sheet's own "Tags" title already labels the
+       filter list, so drop the panel's "Filter by Tags" above it. Matched via
+       :has() on the list's id — the sections below it have no headings to
+       lose, but keying on position would break the moment one gained one. */
+    .mobile-sheet-kbopts .sidebar-section:has(#tagFilterList) h3 { display: none; }
+    .mobile-sheet-kbopts .tag-filter { padding: 12px 10px; min-height: 46px; font-size: 15px; }
+    .mobile-sheet-kbopts .btn-full { min-height: 46px; font-size: 15px; }
+
+    /* --------------------------------------------------------------------
+       17f — The Review page (knowledge/review/).
+
+       Six columns — title, owner, review date, days overdue, modified, edit —
+       so by the "columns known" rule it becomes a card feed rather than a
+       scroller. Keyed on `.review-table`, and on `:first-child` /
+       `:last-child` rather than a column count.
+       -------------------------------------------------------------------- */
+    .review-container { padding: 12px; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+    .review-header { flex-direction: column; align-items: stretch; gap: 10px; }
+    .review-header h1 { font-size: 20px; }
+    .review-search { width: 100%; font-size: 16px; min-height: 44px; box-sizing: border-box; }
+    /* Four tabs with badges don't fit; scroll them rather than wrap to two
+       rows that push the list off the screen (the 15e tab-strip move). */
+    .filter-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+    .filter-tabs::-webkit-scrollbar { display: none; }
+    .filter-tab { flex: 0 0 auto; white-space: nowrap; min-height: 42px; }
+
+    .review-table,
+    .review-table tbody,
+    .review-table tr,
+    .review-table td { display: block; }
+    .review-table thead { display: none; }
+    .review-table tr {
+        position: relative;
+        border: 1px solid var(--border, #ddd);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+    }
+    .review-table td {
+        border-bottom: none;
+        padding: 0;
+        width: auto;
+        white-space: normal;
+        font-size: 13px;
+    }
+    .review-table td:first-child {
+        font-size: 15px;
+        font-weight: 600;
+        padding-right: 62px;        /* clears the pinned Edit action */
+    }
+    /* Once the column headers are gone, a stack of bare values needs a
+       hierarchy or it reads as a list of unexplained strings. The title is the
+       only thing that stays full-strength; everything under it is subordinate,
+       and `.review-date.overdue` keeps its own red on top of this — so the one
+       cell that matters is the one that stands out. No CSS-generated labels:
+       that string would be hardcoded English (this ships in 24 languages), and
+       the reading order does the work instead. */
+    .review-table td + td { margin-top: 5px; color: var(--text-muted, #666); }
+
+    /* ⚠️ The days-overdue cell is a BARE NUMBER — the renderer emits
+       `<span class="days-overdue">139</span>` with the word "days" living only
+       in the column header we just dropped. On a card it reads as noise, and
+       there is no translated string to relabel it with. It also says nothing
+       the line above doesn't: the review date immediately preceding it is
+       already rendered red for exactly this case. So it goes. */
+    .review-table td:has(.days-overdue) { display: none; }
+    /* As 16i: the empty/loading row is one colspan cell — first AND last —
+       and must not be pinned out of its card. */
+    .review-table td:last-child:not(:first-child) {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        margin-top: 0;
+    }
+    .review-table td:last-child:not(:first-child) a,
+    .review-table td:last-child:not(:first-child) button {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 10px;
+    }
+
+    /* --------------------------------------------------------------------
+       17g — The Assistant page (knowledge/assistant/).
+       -------------------------------------------------------------------- */
+    .ka-page { padding: 12px; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+    .ka-head { flex-direction: column; align-items: stretch; gap: 12px; }
+    .ka-head h1 { font-size: 20px; }
+    .ka-btn { min-height: 44px; }
+    .ka-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+    .ka-tabs::-webkit-scrollbar { display: none; }
+    .ka-tab { flex: 0 0 auto; white-space: nowrap; min-height: 42px; }
+
+    /* ====================================================================
+       LAYER 18 — SERVICE STATUS module (#1003)
+
+       The fifth module, and the smallest: one board page, a settings page
+       and a help page. It is also the first that arrived half-responsive —
+       the service board is a `repeat(auto-fill, minmax(200px, 1fr))` grid,
+       so it reflows on its own. The work is the page frame, making that grid
+       useful at 360px rather than merely legal, and the incident table.
+
+       The settings page needed nothing of its own: it is `.container` +
+       renderSettingsTabBar (15e), and its three tables are covered by the
+       "every table on a settings page" rule up in 15e. Help inherits 16h.
+       -------------------------------------------------------------------- */
+
+    /* --------------------------------------------------------------------
+       18a — Page shell. `.status-layout` is already the scroller; what it
+       can't keep is `height: calc(100vh - 48px)`, which is wrong the moment
+       the app header wraps to two lines.
+       -------------------------------------------------------------------- */
+    .status-layout {
+        height: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 12px;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    .section-title { font-size: 16px; margin-bottom: 12px; gap: 10px; }
+    .new-btn { min-height: 40px; padding: 8px 14px; font-size: 14px; white-space: nowrap; }
+
+    /* --------------------------------------------------------------------
+       18b — The service board.
+
+       A 200px minimum gives exactly ONE column at 360px, so a board of a
+       dozen services becomes a dozen full-width cards you scroll through —
+       which loses the thing a board is for: seeing the whole estate's health
+       at a glance. Dropping the floor to 150px gets two up (2×150 + 10 gap =
+       310, inside the 336 available) and roughly halves the scroll.
+       -------------------------------------------------------------------- */
+    .service-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 24px;
+    }
+    .service-card { padding: 12px 10px; }
+    .service-card:hover { box-shadow: none; }      /* a hover lift sticks after a tap */
+    .service-card .service-name { font-size: 13px; }
+
+    /* ---- lining the cards up (#1004) ----
+       Grid rows already stretch every card to the tallest in the row, but the
+       CONTENT inside them didn't stretch with it — so a one-line description
+       put its badge higher than the two-line card beside it, and the row read
+       as ragged. Making the card a flex column and letting the description
+       take the slack pins every badge to the same baseline. */
+    .service-card {
+        display: flex;
+        flex-direction: column;
+    }
+    .service-card .service-desc {
+        font-size: 11px;
+        margin-bottom: 8px;
+        flex: 1 1 auto;             /* absorb the height difference */
+        /* Two lines is the most a 150px card can carry before it starts
+           setting the height of the whole row. `min-height: 0` drops the
+           desktop reservation that keeps empty descriptions aligned — the
+           flex fill does that job better here. */
+        min-height: 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    /* A long status ("Degraded Performance") wrapped to two lines, so that one
+       pill stood taller than every other and the row lost its rhythm. One
+       line, ellipsis if it doesn't fit — Ed's call, and mobile-only: there is
+       room for the full text on a desktop card. The full string stays in the
+       DOM, so it is still read out and still copyable. */
+    .impact-badge {
+        font-size: 11px;
+        padding: 4px 10px;
+        display: block;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        box-sizing: border-box;
+    }
+
+    /* ---- Services and Incidents as two screens (#1004) ----
+       A board plus a feed on one scroll is a lot of thumb. mobile.js injects
+       a two-way switcher and marks the services heading + grid, so each half
+       gets the screen to itself. The attribute lives on <body>, so a page
+       that hasn't been switched yet (or a desktop viewport, where the JS is
+       inert) shows both — the default is the old behaviour. */
+    body[data-ss-tab="incidents"] .ss-services-part { display: none; }
+    body[data-ss-tab="services"] .incidents-section { display: none; }
+
+    .ss-switch {
+        display: flex;
+        gap: 0;
+        margin: 0 0 12px;
+        border: 1px solid var(--border, #e5e7eb);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .ss-switch button {
+        flex: 1;
+        min-height: 40px;
+        padding: 8px 6px;
+        border: none;
+        background: var(--surface, #fff);
+        color: var(--text-muted, #666);
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+    }
+    .ss-switch button + button { border-left: 1px solid var(--border, #e5e7eb); }
+    .ss-switch button.active {
+        background: var(--accent, #10b981);
+        color: var(--on-accent, #fff);
+    }
+    /* With the switcher naming the section, the section's own heading repeats
+       it — but the Services one carries the count and the Incidents one
+       carries the New button, so neither can simply go. Shrink instead. */
+    .status-layout .section-title { font-size: 14px; }
+
+    /* --------------------------------------------------------------------
+       18c — Incidents: four columns become a card feed.
+
+       Columns are known (title / status / affected / updated) and each is
+       self-describing — a title, a coloured status badge, coloured service
+       tags, a date — so reading order carries the meaning and no labels are
+       needed. Contrast the settings tables above, which keep their header
+       row precisely because their columns do NOT self-describe.
+
+       ⚠️ `display: block` needs `!important`: the page's own JS sets
+       `table.style.display = 'table'` inline every time it renders rows, and
+       an inline style beats an ordinary rule.
+       -------------------------------------------------------------------- */
+    .incident-table,
+    .incident-table tbody,
+    .incident-table tr,
+    .incident-table td { display: block !important; }
+    .incident-table thead { display: none !important; }
+    .incident-table {
+        border: none;
+        background: none;
+        box-shadow: none;
+    }
+    .incident-table tr {
+        background: var(--surface, #fff);
+        border: 1px solid var(--border, #e5e7eb);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+    }
+    .incident-table td { border-bottom: none; padding: 0; }
+    .incident-table td + td { margin-top: 7px; }
+    /* The whole card opens the incident, not just the title (#1004) —
+       mobile.js delegates the tap. The title keeps its own handler for
+       desktop, so the pointer cue moves to the row. */
+    .incident-table tr { cursor: pointer; }
+    /* Keyed on the renderer's own classes, never on cell position. */
+    .incident-title { font-size: 15px; font-weight: 600; display: inline-block; }
+    .incident-services-list { display: flex; flex-wrap: wrap; gap: 5px; }
+    .incident-date { font-size: 12px; color: var(--text-dim, #888); }
+    /* Desktop greys a resolved incident with a row class; keep that reading. */
+    .incident-table tr.resolved { opacity: 0.72; }
+
+    /* --------------------------------------------------------------------
+       18d — The incident modal. LAYER 3 makes it a full-screen sheet and the
+       #999 rule sizes its fields; this is the page's own bespoke chrome.
+       -------------------------------------------------------------------- */
+    #incidentModal .modal-content {
+        padding: 0 !important;
+        display: flex;
+        flex-direction: column;
+    }
+    #incidentModal .modal-header { padding: 14px 16px; margin-bottom: 0; flex-shrink: 0; }
+    /* The form is everything below the header INCLUDING the buttons, so it is
+       the scroller and the buttons stick to its bottom edge (below). */
+    #incidentModal form {
+        /* No bottom padding: the action bar below supplies it. A negative
+           bottom margin on the bar would NOT work here — in a flex column,
+           `margin-top: auto` absorbs whatever free space a negative
+           margin-bottom creates, so the two cancel and the bar lands 16px
+           short of the edge. Take the padding off instead. */
+        padding: 16px 16px 0;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        /* A flex column so the action bar can be pushed to the bottom with
+           `margin-top: auto`. Sticky alone is not enough: sticky only stops an
+           element scrolling AWAY, so on a SHORT form (a new incident, one
+           affected service) the bar just sat wherever the fields ended,
+           halfway up the screen. auto-margin handles the short case, sticky
+           handles the long one, and between them the bar is always on the
+           bottom edge. */
+        display: flex;
+        flex-direction: column;
+    }
+    /* Flex children shrink by default — without this the roomy comment box
+       would be squeezed back down whenever the form overflowed. */
+    #incidentModal form > * { flex-shrink: 0; }
+    /* A comment is the substance of an incident update; 80px is a two-line
+       slot. Give it room without letting it push the fields off screen. */
+    #incidentComment { min-height: 140px; height: auto; }
+
+    /* ---- Cancel / Save (/ Delete) pinned to the bottom (#1004) ----
+       `position: sticky` rather than a fixed footer: the actions are inside
+       the <form>, so sticky keeps them there — no DOM restructuring, and the
+       submit button stays a real submit button. The negative margins cancel
+       the form's 16px padding so the bar spans the sheet edge to edge, and
+       are matched exactly by the padding put back, so they cannot add width. */
+    #incidentModal .modal-actions {
+        position: sticky;               /* long form: stay there while scrolling */
+        bottom: 0;
+        z-index: 1;
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+        margin: 16px -16px 0;
+        /* AFTER the shorthand, or the shorthand's `16px` top wins and the bar
+           stops being pushed to the bottom on a short form. */
+        margin-top: auto;
+        padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+        background: var(--surface, #fff);
+        border-top: 1px solid var(--border, #e5e7eb);
+    }
+    /* All three on one row when editing (#1004) — Delete included, so it takes
+       an equal third rather than the desktop `margin-right: auto` shove. */
+    #incidentModal .modal-actions .btn {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 44px;
+        padding: 10px 8px;
+        white-space: nowrap;
+    }
+    #incidentModal .modal-actions .btn-danger { margin-right: 0 !important; }
+    /* Each affected service is a select plus a remove button; the select has
+       to be allowed to shrink or the pair overflows. */
+    .affected-row { gap: 8px; }
+    .affected-row select { min-width: 0; font-size: 16px; min-height: 44px; }
+    .affected-row .remove-svc { flex: 0 0 auto; min-width: 40px; min-height: 40px; }
+    .add-svc-btn { width: 100%; min-height: 42px; }
+
+    /* ====================================================================
+       LAYER 19 — WAR ROOM module (#1008)
+
+       Mobile-friendly from day one rather than as a later round, because a
+       fallback chat is a thing you reach for on a phone almost by definition:
+       your laptop is at your desk and you are in the comms room.
+
+       There is no pane stack and no sub-bar. A chat is one surface: channels
+       across the top, the feed in the middle, the composer pinned at the
+       bottom — the shape every phone chat app already uses, so there is
+       nothing to learn on the day it matters.
+       -------------------------------------------------------------------- */
+    .wr-container {
+        flex-direction: column;
+        height: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    /* The 240px channel column becomes a horizontal strip. It scrolls sideways
+       rather than wrapping: an analyst in six teams would otherwise get three
+       rows of chips pushing the conversation off the screen. */
+    .wr-sidebar {
+        width: auto;
+        flex-shrink: 0;
+        padding: 8px 10px;
+        border-right: none;
+        border-bottom: 1px solid var(--border, #e0e0e0);
+        overflow-y: visible;
+    }
+    /* The "Channels" heading is redundant once they are a row of chips under a
+       bar that already says War room. The per-section headings go too: in a
+       single scrolling row they would appear as unreadable inline fragments
+       between the chips rather than as headings above groups. Order still
+       carries the grouping — all-hands, teams, channels, DMs. */
+    .wr-sidebar-heading,
+    .wr-group { display: none; }
+
+    /* New channel / New message stay, but as a compact pair above the chips —
+       being unable to start a conversation is a real loss on a phone, which is
+       where somebody is most likely to be when they need one. */
+    .wr-sidebar-actions { gap: 8px; margin-bottom: 8px; }
+    .wr-side-btn { min-height: 36px; font-size: 13px; }
+
+    .wr-channels {
+        flex-direction: row;
+        gap: 6px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+    .wr-channels::-webkit-scrollbar { display: none; }
+    .wr-channel {
+        flex: 0 0 auto;
+        width: auto;
+        min-height: 38px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: var(--surface-2, #f5f5f5);
+        white-space: nowrap;
+    }
+
+    /* Presence stays where it is in the DOM (the sidebar) and simply becomes a
+       compact line under the channel chips. Relocating it with JS was the
+       alternative and is not worth a branch for one line of text — but it does
+       mean the rule has to be tight, because in a single column it sits
+       between the chips and the conversation. */
+    .wr-presence {
+        margin-top: 6px;
+        padding: 5px 2px 0;
+        border-top: 1px solid var(--border-soft, #f0f0f0);
+        font-size: 11px;
+        line-height: 1.4;
+    }
+
+    .wr-main { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+    /* The intro explains the module to a first-time reader; on a phone mid-
+       incident it is a paragraph between you and the messages. */
+    .wr-intro { display: none; }
+
+    /* The channel name and its tools have to share one narrow row. The name
+       truncates and the buttons shrink to labels rather than wrapping onto a
+       second row, which would cost another 40px of the conversation. */
+    .wr-topbar { align-items: center; gap: 8px; margin-bottom: 8px; }
+    .wr-title { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wr-topic { display: none; }
+    .wr-tools { gap: 4px; }
+    .wr-tool { min-height: 34px; padding: 6px 10px; font-size: 12px; }
+
+    .wr-messages { padding: 8px 10px; }
+    .wr-msg-body { font-size: 15px; }
+    /* A screenshot at desktop width would be the widest thing on the page, and
+       anything wider than the screen is what makes iOS reflow to desktop. */
+    .wr-thumb img { max-width: 100%; max-height: 200px; }
+    .wr-file { max-width: 100%; }
+
+    .wr-composer { gap: 8px; margin-top: 8px; }
+    /* ⚠️ 16px is required, not cosmetic: under it iOS zooms on focus, the page
+       goes wider than the screen and Safari reflows to a desktop layout —
+       which would switch this whole layer off mid-conversation. */
+    .wr-composer textarea {
+        font-size: 16px;
+        height: 44px;
+    }
+    .wr-composer .btn { height: 44px; padding: 0 16px; }
+    .wr-attach { width: 44px; height: 44px; }
+
+    /* Search and the situation report become full-screen sheets rather than a
+       380px column beside a 360px screen. Fixed rather than in-flow: as a flex
+       child of a column container the panel would otherwise push the whole
+       conversation off the top. */
+    .wr-panel {
+        position: fixed;
+        inset: 0;
+        z-index: 1100;
+        width: auto;
+        border-left: none;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .wr-panel-close { min-width: 44px; min-height: 44px; font-size: 26px; }
+    /* Same 16px rule as the composer, for the same reason. */
+    .wr-search-input,
+    .wr-input,
+    .wr-sitrep-form select { font-size: 16px !important; min-height: 44px; }
+    .wr-result { padding: 12px 10px; }
+
+    /* The @ picker must not be wider than the screen, and must clear the phone
+       keyboard — anchored above the composer it already does. */
+    .wr-ac { left: 0; right: 0; min-width: 0; max-height: 40vh; }
+    .wr-ac-item { min-height: 44px; font-size: 15px; }
+
+    /* No hover on a phone, so the per-message actions are always visible. They sit
+       inline under the message rather than floating over its top-right corner,
+       where they would cover the text on a narrow column. */
+    .wr-msg-acts { position: static; opacity: 1; margin-top: 6px; }
+    .wr-msg-act { min-height: 32px; padding: 4px 12px; font-size: 12px; }
+
+    .wr-desktop-opt { font-size: 13px; }
+    .wr-desktop-opt input { width: 20px; height: 20px; }
+    /* 16px again: a select under it and iOS zooms the page, which is what takes
+       the whole mobile layer off. */
+    .wr-pref select { font-size: 16px !important; min-height: 44px; }
+
+    .wr-modal { padding: 0; align-items: stretch; }
+    .wr-modal-card { max-width: none; max-height: none; border-radius: 0; }
+    .wr-modal-body { padding: 14px; }
+    .wr-modal-actions { flex-direction: column; }
+    .wr-modal-actions .btn { width: 100%; min-height: 44px; }
+    .wr-member { min-height: 44px; }
+    .wr-members { max-height: none; }
+}

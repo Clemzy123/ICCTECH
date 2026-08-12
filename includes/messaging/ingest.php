@@ -1,0 +1,398 @@
+<?php
+/**
+ * Channel message ingest — the bridge from a normalised inbound message onto the
+ * existing ticket "membrane". This is the channel twin of saveEmailToDatabase()
+ * in api/tickets/check_mailbox_email.php: find-or-create a ticket, store the
+ * message in the shared `emails` table (so the reading-pane thread works for
+ * free), route the company, and keep the 24h window state current.
+ *
+ * Deliberately self-contained (no dependency on the email importer's internals)
+ * so it is safe to include from the webhook with just functions.php + tenancy.php
+ * + messaging.php loaded.
+ */
+
+require_once __DIR__ . '/messaging.php';
+require_once __DIR__ . '/../tenancy.php';
+require_once __DIR__ . '/../ticket_reply.php';
+require_once __DIR__ . '/../ticket_snooze.php';
+
+/**
+ * Ingest one normalised inbound message for a (decrypted) channel row.
+ * Returns ['status' => 'created'|'appended'|'duplicate', 'ticket_id' => int|null].
+ */
+function ingestInboundMessage(PDO $conn, array $channel, array $msg): array
+{
+    $channelType = $channel['channel_type'] ?? 'whatsapp';
+    // ⚠️ The channel type MUST be passed: normalisation differs per channel, and
+    // the phone rules would shred a Slack user id into a shared identity.
+    $from = normaliseChannelIdentifier((string) ($msg['from'] ?? ''), $channelType);
+    if ($from === '') {
+        throw new Exception('Inbound message has no usable sender identifier');
+    }
+    $profileName   = trim((string) ($msg['profile_name'] ?? ''));
+    $providerMsgId = trim((string) ($msg['provider_msg_id'] ?? ''));
+
+    // Dedupe: providers can retry webhooks. Skip a message id we already stored.
+    if ($providerMsgId !== '') {
+        $dup = $conn->prepare("SELECT id FROM emails WHERE exchange_message_id = ? AND channel = ? LIMIT 1");
+        $dup->execute([$providerMsgId, $channelType]);
+        if ($dup->fetchColumn()) {
+            return ['status' => 'duplicate', 'ticket_id' => null];
+        }
+    }
+
+    // Body is the caption (channel media) or the text. Media is downloaded after the
+    // message row exists, because attachments are keyed to the email row's id.
+    $body = trim((string) ($msg['body'] ?? ''));
+    $mediaItems = is_array($msg['media'] ?? null) ? $msg['media'] : [];
+    $hasMedia = !empty($mediaItems);
+    if ($body === '' && !$hasMedia) {
+        $body = '[empty message]';
+    }
+
+    // Where a reply to this message has to go.
+    //
+    // ⚠️ Phone channels keep their previous value EXACTLY — the channel's own
+    // number. Twilio and Meta do both supply a 'to' in the parsed message and it
+    // is normally the same number, but "normally" is not a good enough reason to
+    // change what a working WhatsApp install writes to the database. Only Slack,
+    // where the sender and the destination are genuinely different things (you
+    // answer into a channel and a thread, not to a person), reads it.
+    $replyAddress = (string) ($channel['phone_number'] ?? '');
+    if ($channelType === 'slack') {
+        $replyAddress = trim((string) ($msg['to'] ?? ''));
+    }
+
+    $displayName = $profileName !== '' ? $profileName : $from;
+    if ($channelType === 'slack') {
+        // Ask Slack who this is. Never fatal: a ticket must still be raised if
+        // the lookup fails, just with a less useful name on it.
+        [$userId, $displayName] = resolveSlackRequester($conn, $channel, $from);
+    } else {
+        $userId = getOrCreateChannelUser($conn, $from, $displayName, $channelType);
+    }
+
+    // Thread into an open conversation, else open a new ticket.
+    //
+    // ⚠️ "The same conversation" is not the same question on every channel. On
+    // WhatsApp a person has ONE conversation with the service desk, so the sender
+    // identifies it. In Slack the same person can have several unrelated threads
+    // going at once — so the THREAD is the conversation, and matching on the
+    // sender would pile every one of their questions onto a single ticket.
+    $ticketId  = findOpenChannelTicket($conn, $from, $channelType, $replyAddress);
+    $isInitial = $ticketId ? 0 : 1;
+    $subject   = null;
+
+    if (!$ticketId) {
+        $ticketNumber = messagingGenerateTicketNumber($conn);
+        $tenantId     = resolveTicketTenantForChannel($conn, $channel['id'], $from);
+        $originId     = getChannelOriginId($conn, $channelType);
+        $subject      = buildChannelSubject($channelType, $displayName, $body);
+
+        $sql = "INSERT INTO tickets (
+                    ticket_number, subject, status_id, priority_id,
+                    created_datetime, updated_datetime, last_inbound_at,
+                    user_id, tenant_id, origin_id
+                ) VALUES (
+                    ?, ?,
+                    (SELECT id FROM ticket_statuses   WHERE name = 'Open'   LIMIT 1),
+                    (SELECT id FROM ticket_priorities WHERE name = 'Normal' LIMIT 1),
+                    UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP(),
+                    ?, ?, ?
+                )";
+        $conn->prepare($sql)->execute([$ticketNumber, $subject, $userId, $tenantId, $originId]);
+        $ticketId = (int) $conn->lastInsertId();
+    } else {
+        $conn->prepare("UPDATE tickets SET updated_datetime = UTC_TIMESTAMP(), last_inbound_at = UTC_TIMESTAMP() WHERE id = ?")
+             ->execute([$ticketId]);
+        // Messaging in on a finished ticket is the customer coming back, exactly
+        // as an email or portal reply is — same shared rule, same setting.
+        reopenTicketForCustomerReply($conn, (int)$ticketId);
+        wakeSnoozedTicketOnCustomerReply($conn, (int)$ticketId);
+    }
+
+    // Store the message in the shared emails table (channel = 'whatsapp' etc.).
+    $sql = "INSERT INTO emails (
+                exchange_message_id, subject, from_address, from_name,
+                to_recipients, received_datetime, body_content, body_type,
+                has_attachments, is_read, processed_datetime, ticket_id,
+                is_initial, direction, channel, channel_id
+            ) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, 'text', ?, 0, UTC_TIMESTAMP(), ?, ?, 'Inbound', ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([
+        $providerMsgId !== '' ? $providerMsgId : null,
+        $subject,
+        $from,
+        $displayName,
+        $replyAddress,
+        $body,
+        0, // has_attachments — set below once media is actually downloaded
+        $ticketId,
+        $isInitial,
+        $channelType,
+        (int) $channel['id'],
+    ]);
+    $dbEmailId = (int) $conn->lastInsertId();
+
+    // Download any media and attach it (reuses the email-attachment store, so it shows
+    // in the reading pane's attachment bar like any email attachment).
+    if ($hasMedia) {
+        $saved = 0;
+        try {
+            $provider = messagingProvider($channel);
+            foreach ($mediaItems as $mediaItem) {
+                try {
+                    $dl = $provider->downloadMedia($mediaItem);
+                    if (!empty($dl['data'])) {
+                        saveChannelMediaAttachment(
+                            $conn, $dbEmailId,
+                            $dl['filename'] ?? 'media',
+                            $dl['content_type'] ?? 'application/octet-stream',
+                            $dl['data']
+                        );
+                        $saved++;
+                    }
+                } catch (Exception $e) {
+                    error_log('channel media download failed (email ' . $dbEmailId . '): ' . $e->getMessage());
+                }
+            }
+        } catch (Exception $e) {
+            error_log('channel media: provider unavailable: ' . $e->getMessage());
+        }
+
+        if ($saved > 0) {
+            $conn->prepare("UPDATE emails SET has_attachments = 1 WHERE id = ?")->execute([$dbEmailId]);
+        } else {
+            // Couldn't fetch it — leave a marker so the analyst knows media was sent.
+            $note = '[media attachment could not be downloaded]';
+            $newBody = ($body === '' || $body === '[empty message]') ? $note : ($body . "\n\n" . $note);
+            $conn->prepare("UPDATE emails SET body_content = ? WHERE id = ?")->execute([$newBody, $dbEmailId]);
+        }
+    }
+
+    // Keep the channel's own last-inbound stamp current (diagnostics / settings).
+    try {
+        $conn->prepare("UPDATE messaging_channels SET last_inbound_datetime = UTC_TIMESTAMP() WHERE id = ?")
+             ->execute([(int) $channel['id']]);
+    } catch (Exception $e) { /* non-fatal */ }
+
+    return ['status' => $isInitial ? 'created' : 'appended', 'ticket_id' => (int) $ticketId];
+}
+
+/**
+ * Find the most recent OPEN (not closed, not trashed) ticket for this
+ * conversation, so repeat messages thread into one ticket.
+ *
+ * ⚠️ What counts as "this conversation" is per-channel:
+ *
+ *   phone channels — the SENDER. A person has one running conversation with the
+ *                    service desk, so their number identifies it.
+ *   slack          — the THREAD. One person can have five unrelated threads open
+ *                    at once, and matching on the sender would collapse all five
+ *                    onto one ticket. $replyAddress is "C08HELP:1719500000.0001",
+ *                    which is exactly the thread.
+ */
+function findOpenChannelTicket(PDO $conn, string $from, string $channelType, string $replyAddress = ''): ?int
+{
+    $byThread = ($channelType === 'slack' && $replyAddress !== '');
+
+    $sql = "SELECT t.id
+            FROM tickets t
+            JOIN emails e ON e.ticket_id = t.id
+            WHERE e.channel = ? AND " . ($byThread ? "e.to_recipients = ?" : "e.from_address = ?") . "
+              AND t.deleted_datetime IS NULL
+              AND t.closed_datetime IS NULL
+            ORDER BY t.updated_datetime DESC
+            LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$channelType, $byThread ? $replyAddress : $from]);
+    $id = $stmt->fetchColumn();
+    return $id ? (int) $id : null;
+}
+
+/**
+ * Work out who a Slack message is from. Returns [userId|null, displayName].
+ *
+ * ⚠️ Halo's Slack integration requires the person's Slack email to equal their
+ * Halo email, which quietly fails for guests, contractors and anyone whose Slack
+ * account is a personal address. We do the lookup but never *depend* on it:
+ *
+ *   1. ask Slack for the profile (needs users:read + users:read.email)
+ *   2. if it gives an email we already know, the ticket belongs to that person
+ *   3. otherwise fall back to a channel pseudo-user — and NAME the case, so the
+ *      ticket says "Sam Okafor (Slack)" or "Slack user @U08ABCDEF" rather than
+ *      something anonymous that an analyst cannot act on
+ *
+ * Every failure path still returns a usable requester. Losing the identity must
+ * never lose the ticket.
+ */
+function resolveSlackRequester(PDO $conn, array $channel, string $slackUserId): array
+{
+    $name = '';
+    $email = '';
+    try {
+        $provider = messagingProvider($channel);
+        if ($provider instanceof SlackProvider) {
+            $info  = $provider->lookupUser($slackUserId);
+            $name  = trim((string) ($info['name'] ?? ''));
+            $email = trim((string) ($info['email'] ?? ''));
+        }
+    } catch (Exception $e) {
+        error_log('Slack requester lookup failed for ' . $slackUserId . ': ' . $e->getMessage());
+    }
+
+    // A real person we already hold — their tickets, history and company all
+    // line up with the rest of the service desk.
+    if ($email !== '') {
+        try {
+            $stmt = $conn->prepare("SELECT id, display_name FROM users WHERE email = ? LIMIT 1");
+            $stmt->execute([$email]);
+            if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $known = trim((string) ($row['display_name'] ?? ''));
+                return [(int) $row['id'], $known !== '' ? $known : ($name !== '' ? $name : $email)];
+            }
+        } catch (Exception $e) { /* fall through to the pseudo-user */ }
+    }
+
+    // Name the case rather than leaving it blank.
+    $fallbackName = 'Slack user @' . $slackUserId;
+    $displayName  = $name !== '' ? ($name . ' (Slack)') : $fallbackName;
+    $userId = getOrCreateChannelUser($conn, $slackUserId, $displayName, 'slack');
+
+    // ⚠️ Let the name HEAL. getOrCreateChannelUser only sets a display name when
+    // it creates the row, so somebody first seen while the lookup was failing
+    // would keep "Slack user @U0A1B2C3" for ever — even after the cause is fixed.
+    //
+    // That is not a rare edge: Slack grants an app its scopes at install time, so
+    // an app created from a manifest cannot read profiles until someone clicks
+    // "Reinstall to Workspace". Tickets raised before that all name nobody, and
+    // there is no obvious way for an admin to connect the two facts.
+    //
+    // Only ever replaces our OWN fallback string. A name an analyst has edited by
+    // hand does not match that pattern, so it is never overwritten.
+    if ($userId && $name !== '') {
+        try {
+            $upd = $conn->prepare(
+                "UPDATE users SET display_name = ? WHERE id = ? AND display_name = ?"
+            );
+            $upd->execute([$displayName, $userId, $fallbackName]);
+        } catch (Exception $e) { /* cosmetic — never worth failing the ticket */ }
+    }
+
+    return [$userId, $displayName];
+}
+
+/**
+ * Get-or-create a placeholder requester keyed by phone, so repeat senders map to
+ * one user. The users table requires an email, so we synthesise a stable
+ * non-routable address ('+44…@whatsapp.local'); the real identity is the
+ * display name (the WhatsApp profile name) shown on the ticket.
+ */
+function getOrCreateChannelUser(PDO $conn, string $from, string $displayName, string $channelType): ?int
+{
+    $pseudoEmail = ltrim($from, '+') . '@' . $channelType . '.local';
+    try {
+        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+        $stmt->execute([$pseudoEmail]);
+        $id = $stmt->fetchColumn();
+        if ($id) {
+            return (int) $id;
+        }
+        $ins = $conn->prepare("INSERT INTO users (email, display_name, created_at) VALUES (?, ?, UTC_TIMESTAMP())");
+        $ins->execute([$pseudoEmail, $displayName !== '' ? $displayName : $from]);
+        return (int) $conn->lastInsertId();
+    } catch (Exception $e) {
+        // users table shape differs / unavailable → leave the ticket requester unset.
+        return null;
+    }
+}
+
+/** The origin id for a channel type (e.g. the seeded 'WhatsApp' origin), or null. */
+function getChannelOriginId(PDO $conn, string $channelType): ?int
+{
+    $name = $channelType === 'whatsapp' ? 'WhatsApp' : ($channelType === 'webchat' ? 'Web chat' : ucfirst($channelType));
+    try {
+        $stmt = $conn->prepare("SELECT id FROM ticket_origins WHERE name = ? ORDER BY (tenant_id IS NULL) DESC, id ASC LIMIT 1");
+        $stmt->execute([$name]);
+        $id = $stmt->fetchColumn();
+        return $id ? (int) $id : null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+/** A short, human ticket subject from the first line of the first message. */
+function buildChannelSubject(string $channelType, string $displayName, string $body): string
+{
+    $label = $channelType === 'whatsapp' ? 'WhatsApp' : ($channelType === 'webchat' ? 'Web chat' : ucfirst($channelType));
+    $firstLine = trim(strtok($body, "\n"));
+    if ($firstLine === '' || $firstLine === '[empty message]') {
+        return "$label message from $displayName";
+    }
+    if (function_exists('mb_strimwidth')) {
+        $snippet = mb_strimwidth($firstLine, 0, 80, '…');
+    } else {
+        $snippet = strlen($firstLine) > 80 ? substr($firstLine, 0, 79) . '…' : $firstLine;
+    }
+    return "$label: $snippet";
+}
+
+/** Unique ticket number in the existing XXX-NNN-NNNNN format. */
+function messagingGenerateTicketNumber(PDO $conn): string
+{
+    for ($attempt = 0; $attempt < 10; $attempt++) {
+        $letters = chr(rand(65, 90)) . chr(rand(65, 90)) . chr(rand(65, 90));
+        $n1 = rand(0, 9) . rand(0, 9) . rand(0, 9);
+        $n2 = rand(0, 9) . rand(0, 9) . rand(0, 9) . rand(0, 9) . rand(0, 9);
+        $ticketNumber = "$letters-$n1-$n2";
+        $check = $conn->prepare("SELECT COUNT(*) FROM tickets WHERE ticket_number = ?");
+        $check->execute([$ticketNumber]);
+        if (!$check->fetchColumn()) {
+            return $ticketNumber;
+        }
+    }
+    throw new Exception('Failed to generate unique ticket number');
+}
+
+/**
+ * Save downloaded channel media as a ticket attachment, using the same storage
+ * convention as email attachments (tickets/attachments/{floor(id/1000)}/{emailId}/…),
+ * so get_ticket_attachments.php and the reading-pane attachment bar pick it up.
+ */
+function saveChannelMediaAttachment(PDO $conn, int $emailId, string $filename, string $contentType, string $data): void
+{
+    $attachmentsDir = dirname(dirname(__DIR__)) . '/tickets/attachments';
+    if (!is_dir($attachmentsDir)) {
+        mkdir($attachmentsDir, 0755, true);
+    }
+    $subDir = floor($emailId / 1000);
+    $emailDir = $attachmentsDir . '/' . $subDir . '/' . $emailId;
+    if (!is_dir($emailDir)) {
+        mkdir($emailDir, 0755, true);
+    }
+
+    $safeFilename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+    if ($safeFilename === '' || $safeFilename[0] === '.') {
+        $safeFilename = 'media' . $safeFilename;
+    }
+    $filePath = $subDir . '/' . $emailId . '/' . $safeFilename;
+    $fullPath = $attachmentsDir . '/' . $filePath;
+
+    // De-dup the filename if it already exists.
+    $counter = 1;
+    $pi = pathinfo($safeFilename);
+    while (file_exists($fullPath)) {
+        $newName = $pi['filename'] . '_' . $counter . (isset($pi['extension']) ? '.' . $pi['extension'] : '');
+        $filePath = $subDir . '/' . $emailId . '/' . $newName;
+        $fullPath = $attachmentsDir . '/' . $filePath;
+        $counter++;
+    }
+
+    if (file_put_contents($fullPath, $data) === false) {
+        throw new Exception('Failed to write media file: ' . $filename);
+    }
+
+    $sql = "INSERT INTO email_attachments (email_id, exchange_attachment_id, filename, content_type, content_id, file_path, file_size, is_inline)
+            VALUES (?, NULL, ?, ?, NULL, ?, ?, 0)";
+    $conn->prepare($sql)->execute([$emailId, $filename, $contentType, $filePath, strlen($data)]);
+}

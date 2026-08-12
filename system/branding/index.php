@@ -1,0 +1,462 @@
+<?php
+/**
+ * System - Branding Settings
+ *
+ * Organisation-wide branding: logo + default header/footer template slots.
+ * These act as the fallback for any module that renders branded output
+ * (currently Network Mapper's diagram header/footer; future PDF/PNG export
+ * surfaces will read the same settings).
+ */
+session_start();
+require_once '../../config.php';
+require_once '../../includes/i18n.php';
+require_once '../../includes/timezone.php';
+require_once '../../includes/theme.php';
+I18n::initFromSession();
+Tz::init();
+
+$current_page = 'branding';
+$path_prefix = '../../';
+$translationNamespaces = ['common', 'system'];
+?>
+<!DOCTYPE html>
+<html lang="<?php echo htmlspecialchars(I18n::getLocale()); ?>" data-theme="<?php echo htmlspecialchars(Theme::active()); ?>" data-theme-mode="<?php echo htmlspecialchars(Theme::mode()); ?>">
+<head>
+    <link rel="icon" type="image/svg+xml" href="<?php echo defined('BASE_URL') ? BASE_URL : '/'; ?>favicon.svg">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Desk - <?php echo htmlspecialchars(t('system.branding.title')); ?></title>
+    <link rel="stylesheet" href="../../assets/css/theme.css?v=23">
+    <link rel="stylesheet" href="../../assets/css/inbox.css">
+    <style>
+        body {
+            /* System is the FIRST module whose DARK accent is a LIGHT colour (#90a4ae).
+               inbox.css renders .btn-primary/.add-btn as background:var(--accent) +
+               color:var(--on-accent) — and the global --on-accent stays WHITE in dark.
+               So pinning --accent alone would put white text on a light button. Pin
+               --on-accent too: it flips to near-black in dark. */
+            --accent: var(--sys-accent, #546e7a);
+            --accent-hover: var(--sys-accent-hover, #37474f);
+            --on-accent: var(--sys-on-accent, #fff);
+        }
+
+        .branding-container {
+            height: calc(100vh - 48px);
+            overflow-y: auto;
+            padding: 30px 20px;
+        }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text, #333);
+            margin: 0 0 6px 0;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            color: var(--text-dim, #888);
+            margin: 0 0 30px 0;
+        }
+
+        .settings-card {
+            background: var(--surface, #fff);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 4px var(--shadow, rgba(0,0,0,0.08));
+            margin-bottom: 24px;
+        }
+
+        .settings-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text, #333);
+            margin: 0 0 4px 0;
+        }
+
+        .settings-card .card-desc {
+            font-size: 13px;
+            color: var(--text-dim, #888);
+            margin: 0 0 20px 0;
+            line-height: 1.5;
+        }
+
+        /* Logo block */
+        .logo-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-preview {
+            width: 140px;
+            height: 80px;
+            border: 1px dashed var(--border, #ccc);
+            border-radius: 6px;
+            background: var(--surface-2, #fafafa);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .logo-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .logo-preview .no-logo {
+            font-size: 11px;
+            color: var(--text-faint, #aaa);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .logo-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .logo-controls .file-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-controls input[type="file"] {
+            font-size: 12px;
+            color: var(--text, #333);
+        }
+
+        .logo-hint {
+            font-size: 12px;
+            color: var(--text-dim, #888);
+            line-height: 1.5;
+        }
+
+        /* Slot grid */
+        .slot-grid {
+            display: grid;
+            grid-template-columns: 80px 1fr 1fr 1fr;
+            gap: 10px 12px;
+            align-items: center;
+        }
+
+        .slot-grid .row-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text, #444);
+            text-align: right;
+            padding-right: 4px;
+        }
+
+        .slot-grid .col-head {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim, #888);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+
+        .slot-input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: inherit;
+            box-sizing: border-box;
+            background: var(--surface, #fff);
+            color: var(--text, #333);
+        }
+
+        .slot-input:focus { outline: none; border-color: #06b6d4; }
+
+        .info-note {
+            background: #f5f7fa;
+            border: 1px solid var(--border, #e0e0e0);
+            border-radius: 6px;
+            padding: 14px 16px;
+            font-size: 12px;
+            color: var(--text-muted, #666);
+            line-height: 1.6;
+            margin-top: 16px;
+        }
+
+        .info-note strong { color: var(--text, #333); }
+
+        .info-note code {
+            background: var(--surface, #fff);
+            border: 1px solid var(--border, #e0e0e0);
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-size: 11px;
+            color: #06b6d4;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .save-area {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--sys-accent, #546e7a);
+            color: var(--sys-on-accent, #fff);
+        }
+
+        .btn-primary:hover { background: #455a64; }
+
+        .btn-secondary {
+            background: var(--surface, #fff);
+            color: var(--text-muted, #555);
+            border: 1px solid var(--border, #ddd);
+        }
+
+        .btn-secondary:hover { background: #f5f7fa; }
+        .btn-link {
+            background: none;
+            color: #c62828;
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .btn-link:hover { text-decoration: underline; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ---- Dark mode overrides (pale washes / hovers that would glow) ---- */
+        [data-theme-mode="dark"] .info-note { background: #22293a; }
+        [data-theme-mode="dark"] .btn-primary:hover { background: #b0bec5; }
+        [data-theme-mode="dark"] .btn-secondary:hover { background: var(--surface-hover, #2a3140); }
+        [data-theme-mode="dark"] .btn-link { color: #ef5350; }
+    </style>
+</head>
+<body>
+    <?php include '../includes/header.php'; ?>
+
+    <div class="branding-container">
+        <h1 class="page-title">Branding</h1>
+        <p class="page-subtitle">Set the organisation logo and default header/footer text used on diagrams and exported documents</p>
+
+        <form id="brandingForm" enctype="multipart/form-data">
+            <!-- Logo -->
+            <div class="settings-card">
+                <h3><?php echo htmlspecialchars(t('system.branding.logo_heading')); ?></h3>
+                <p class="card-desc"><?php echo t('system.branding.logo_desc', ['code' => '<code>{{logo}}</code>']); ?></p>
+                <div class="logo-row">
+                    <div class="logo-preview" id="logoPreview">
+                        <span class="no-logo"><?php echo htmlspecialchars(t('system.branding.no_logo')); ?></span>
+                    </div>
+                    <div class="logo-controls">
+                        <div class="file-row">
+                            <input type="file" id="logoFile" name="logo" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml">
+                            <button type="button" class="btn btn-link" id="removeLogoBtn" style="display:none;"><?php echo htmlspecialchars(t('system.branding.remove')); ?></button>
+                        </div>
+                        <div class="logo-hint"><?php echo htmlspecialchars(t('system.branding.logo_hint')); ?></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Header slots -->
+            <div class="settings-card">
+                <h3><?php echo htmlspecialchars(t('system.branding.header_heading')); ?></h3>
+                <p class="card-desc"><?php echo htmlspecialchars(t('system.branding.header_desc')); ?></p>
+                <div class="slot-grid">
+                    <div></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('system.branding.col_left')); ?></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('system.branding.col_centre')); ?></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('system.branding.col_right')); ?></div>
+
+                    <div class="row-label"><?php echo htmlspecialchars(t('system.branding.row_header')); ?></div>
+                    <input type="text" class="slot-input" id="headerLeft" maxlength="200">
+                    <input type="text" class="slot-input" id="headerCenter" maxlength="200">
+                    <input type="text" class="slot-input" id="headerRight" maxlength="200">
+                </div>
+            </div>
+
+            <!-- Footer slots -->
+            <div class="settings-card">
+                <h3><?php echo htmlspecialchars(t('system.branding.footer_heading')); ?></h3>
+                <p class="card-desc"><?php echo htmlspecialchars(t('system.branding.footer_desc')); ?></p>
+                <div class="slot-grid">
+                    <div></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('system.branding.col_left')); ?></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('system.branding.col_centre')); ?></div>
+                    <div class="col-head"><?php echo htmlspecialchars(t('system.branding.col_right')); ?></div>
+
+                    <div class="row-label"><?php echo htmlspecialchars(t('system.branding.row_footer')); ?></div>
+                    <input type="text" class="slot-input" id="footerLeft" maxlength="200">
+                    <input type="text" class="slot-input" id="footerCenter" maxlength="200">
+                    <input type="text" class="slot-input" id="footerRight" maxlength="200">
+                </div>
+
+                <div class="info-note">
+                    <strong><?php echo htmlspecialchars(t('system.branding.tokens_heading')); ?></strong> — <?php echo htmlspecialchars(t('system.branding.tokens_intro')); ?><br>
+                    <code>{{logo}}</code> <?php echo htmlspecialchars(t('system.branding.token_logo')); ?>
+                    &nbsp;·&nbsp; <code>{{title}}</code> <?php echo htmlspecialchars(t('system.branding.token_title')); ?>
+                    &nbsp;·&nbsp; <code>{{author}}</code> <?php echo htmlspecialchars(t('system.branding.token_author')); ?>
+                    &nbsp;·&nbsp; <code>{{version}}</code> <?php echo htmlspecialchars(t('system.branding.token_version')); ?>
+                    &nbsp;·&nbsp; <code>{{modified}}</code> <?php echo htmlspecialchars(t('system.branding.token_modified')); ?><br>
+                    <?php echo htmlspecialchars(t('system.branding.tokens_example_prefix')); ?> <code>Author: {{author}}</code> <?php echo htmlspecialchars(t('system.branding.tokens_example_suffix')); ?> <em><?php echo htmlspecialchars(t('system.branding.tokens_example_render')); ?></em>.
+                </div>
+            </div>
+
+            <div class="save-area">
+                <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(t('system.branding.save')); ?></button>
+                <button type="button" class="btn btn-secondary" id="resetBtn"><?php echo htmlspecialchars(t('system.branding.reset_defaults')); ?></button>
+            </div>
+        </form>
+    </div>
+
+    <script>window.translations = <?php echo json_encode(I18n::exportForJs($translationNamespaces), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
+    <?php echo Tz::scriptTag(); ?>
+    <script src="../../assets/js/tz.js?v=1"></script>
+    <script src="../../assets/js/i18n.js?v=2"></script>
+    <script>
+    const API_BASE = '<?php echo $path_prefix; ?>api/system/';
+    const PATH_PREFIX = '<?php echo $path_prefix; ?>';
+
+    // Defaults match the get_branding.php fallback so the "Reset" button gives
+    // the same values you'd see on a brand-new install.
+    const DEFAULTS = {
+        header_left:   '{{logo}}',
+        header_center: '{{title}}',
+        header_right:  '',
+        footer_left:   'Author: {{author}}',
+        footer_center: '{{version}}',
+        footer_right:  'Modified: {{modified}}',
+    };
+
+    let currentLogoPath = null;
+    let pendingRemoveLogo = false;
+
+    async function loadBranding() {
+        try {
+            const resp = await fetch(API_BASE + 'get_branding.php');
+            const data = await resp.json();
+            if (!data.success) {
+                showToast(window.t('system.branding.load_failed', { error: data.error }), 'error');
+                return;
+            }
+            const b = data.branding;
+            document.getElementById('headerLeft').value = b.header_left || '';
+            document.getElementById('headerCenter').value = b.header_center || '';
+            document.getElementById('headerRight').value = b.header_right || '';
+            document.getElementById('footerLeft').value = b.footer_left || '';
+            document.getElementById('footerCenter').value = b.footer_center || '';
+            document.getElementById('footerRight').value = b.footer_right || '';
+
+            currentLogoPath = b.logo_path || null;
+            renderLogoPreview();
+        } catch (e) {
+            showToast(window.t('system.branding.load_failed_generic'), 'error');
+        }
+    }
+
+    function renderLogoPreview(localObjectUrl) {
+        const preview = document.getElementById('logoPreview');
+        const removeBtn = document.getElementById('removeLogoBtn');
+        if (localObjectUrl) {
+            preview.innerHTML = '<img src="' + localObjectUrl + '" alt="Logo preview">';
+            removeBtn.style.display = 'inline-flex';
+        } else if (currentLogoPath && !pendingRemoveLogo) {
+            preview.innerHTML = '<img src="' + PATH_PREFIX + currentLogoPath + '" alt="Current logo">';
+            removeBtn.style.display = 'inline-flex';
+        } else {
+            preview.innerHTML = '<span class="no-logo">No logo</span>';
+            removeBtn.style.display = 'none';
+        }
+    }
+
+    document.getElementById('logoFile').addEventListener('change', function(e) {
+        const f = this.files[0];
+        if (!f) return;
+        if (f.size > 2 * 1024 * 1024) {
+            showToast(window.t('system.branding.logo_too_large'), 'error');
+            this.value = '';
+            return;
+        }
+        pendingRemoveLogo = false;
+        renderLogoPreview(URL.createObjectURL(f));
+    });
+
+    document.getElementById('removeLogoBtn').addEventListener('click', function() {
+        // Clear any picked file AND mark the stored logo for deletion on save.
+        document.getElementById('logoFile').value = '';
+        pendingRemoveLogo = true;
+        renderLogoPreview();
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', function() {
+        document.getElementById('headerLeft').value   = DEFAULTS.header_left;
+        document.getElementById('headerCenter').value = DEFAULTS.header_center;
+        document.getElementById('headerRight').value  = DEFAULTS.header_right;
+        document.getElementById('footerLeft').value   = DEFAULTS.footer_left;
+        document.getElementById('footerCenter').value = DEFAULTS.footer_center;
+        document.getElementById('footerRight').value  = DEFAULTS.footer_right;
+        showToast(window.t('system.branding.reset_hint'), 'info');
+    });
+
+    document.getElementById('brandingForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true;
+
+        const fd = new FormData();
+        fd.append('header_left',   document.getElementById('headerLeft').value);
+        fd.append('header_center', document.getElementById('headerCenter').value);
+        fd.append('header_right',  document.getElementById('headerRight').value);
+        fd.append('footer_left',   document.getElementById('footerLeft').value);
+        fd.append('footer_center', document.getElementById('footerCenter').value);
+        fd.append('footer_right',  document.getElementById('footerRight').value);
+
+        const logoInput = document.getElementById('logoFile');
+        if (logoInput.files && logoInput.files[0]) {
+            fd.append('logo', logoInput.files[0]);
+        } else if (pendingRemoveLogo) {
+            fd.append('remove_logo', '1');
+        }
+
+        try {
+            const resp = await fetch(API_BASE + 'save_branding.php', {
+                method: 'POST',
+                body: fd
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast(window.t('system.branding.saved'), 'success');
+                // Re-fetch so the preview reflects whatever's actually on disk now
+                pendingRemoveLogo = false;
+                logoInput.value = '';
+                await loadBranding();
+            } else {
+                showToast(window.t('system.branding.error', { error: data.error }), 'error');
+            }
+        } catch (err) {
+            showToast(window.t('system.branding.save_failed'), 'error');
+        }
+        btn.disabled = false;
+    });
+
+    loadBranding();
+    </script>
+</body>
+</html>
