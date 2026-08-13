@@ -73,29 +73,6 @@ To deliver and document a deployable ITSM solution that improves the recording, 
 - **Compatibility:** The solution shall operate within a Linux-based web-server environment supporting PHP 7.4–8.4 and MySQL 8.0 or later and shall be accessible through commonly used web browsers.
 - **Deployability:** The application shall be capable of being deployed to a cloud-hosted web server for remote access. The final ICCTECH solution is deployed on a Linode cloud server and is accessible through the verified live application URL: http://45.79.223.146:8080/index.php.
 
-### Prioritisation method
-
-MoSCoW prioritisation was used. “Must” requirements define the minimum viable, demonstrable service-desk workflow; “Should” requirements improve operational usefulness; “Could” requirements are deferred when time is constrained.
-
-## 4. Effort estimation and lifecycle
-
-### Estimation approach
-
-The project uses expert estimation with timeboxing because the examination has a fixed 48-hour duration and the work is a scoped adaptation/deployment rather than greenfield development. Estimates guide what evidence and configuration can be completed without compromising the required core workflow.
-
-| Activity                                        | Estimated hours |
-| ----------------------------------------------- | --------------: |
-| Requirements, scope and estimation              |               6 |
-| Analysis and design artefacts                   |               6 |
-| Environment setup, configuration and adaptation |              17 |
-| Testing and defect correction                   |               7 |
-| Deployment and production verification          |               4 |
-| Documentation and submission checks             |               8 |
-| **Total**                                       |          **48** |
-
-**Assumptions:** a suitable PHP/MySQL or Docker environment is available; the upstream codebase is available under its licence; and external service credentials are not required for the minimum scope.<br>
-**Constraint:** the 48-hour examination limit requires strict prioritisation and documented deferral of non-core work.
-
 ## 5. Analysis and design
 
 ### Architecture
