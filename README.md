@@ -73,38 +73,76 @@ To deliver and document a deployable ITSM solution that improves the recording, 
 - **Compatibility:** The solution shall operate within a Linux-based web-server environment supporting PHP 7.4–8.4 and MySQL 8.0 or later and shall be accessible through commonly used web browsers.
 - **Deployability:** The application shall be capable of being deployed to a cloud-hosted web server for remote access. The final ICCTECH solution is deployed on a Linode cloud server and is accessible through the verified live application URL: http://45.79.223.146:8080/index.php.
 
-## 5. Analysis and design
+## 4. Analysis and design
 
 ### Architecture
 
+ICCTECH uses a containerised deployment architecture hosted on a Linode Linux cloud server. Users access the system through a web browser, while Docker separates the PHP web application from the MySQL database and uses persistent volumes to retain operational data and protected application files.
+
 ```text
-End user / Support analyst
-           |
-           v
-Browser interface (self-service portal / analyst workspace)
-           |
-           v
-PHP application modules and authentication/authorisation layer
-           |
-           v
-MySQL database (tickets, users, assets, knowledge and audit data)
+End user / Support analyst / Administrator
+                    |
+                    v
+             Web browser
+                    |
+              HTTP port 8080
+                    |
+                    v
+        Linode Linux cloud server
+                    |
+                    v
+       Docker application container
+          Apache + PHP 8.4
+                    |
+          PHP application modules
+       Authentication and role access
+                    |
+                PDO/MySQL
+                    |
+                    v
+         Docker MySQL 8.0 container
+                    |
+                    v
+       Persistent database volume
+
+Additional persistent volumes:
+- Ticket attachments
+- Change-management attachments
+- Application encryption keys
 ```
+
+The application container exposes Apache on port 80, which Docker maps to port 8080 on the Linode host. The application communicates with the separate MySQL container over the internal Docker network. Persistent Docker volumes protect the database, uploaded attachments and encryption keys from being lost when containers are recreated.
 
 ### Core ticket workflow
 
 ```text
-Ticket submitted -> Categorised -> Assigned -> In progress
-                                      |             |
-                                      v             v
-                                  Updated <--- Analyst response
-                                                    |
-                                                    v
-                                             Resolved / Closed
+Ticket submitted
+       |
+       v
+Open: triaged, categorised, prioritised and assigned
+       |
+       v
+In Progress
+   |         \
+   v          v
+On Hold    Awaiting Response
+   |          |
+   +----------+
+       |
+       v
+In Progress
+       |
+       v
+Closed
+
+A closed ticket may be reopened if further work is required.
 ```
+
+`Open`, `In Progress`, `On Hold`, `Awaiting Response` and `Closed` are the default ticket statuses. Triage, categorisation, prioritisation, assignment and analyst communication are ticket-handling activities rather than separate statuses. Statuses are configurable by an administrator, and `On Hold` and `Awaiting Response` pause the service-level agreement clock by default.
 
 The detailed SRS, use cases, data model, UI evidence and selected design diagrams should be included in the submitted `Project_Documentation.pdf` or linked supporting documentation.
 
-## 6. Technology and local setup
+## 5. Technology and local setup
 
 - PHP 7.4–8.4
 - MySQL 8.0+
@@ -120,7 +158,7 @@ docker compose up -d
 
 Open `http://localhost:8080/setup/` to complete local installation. Configure the database and application secrets before using the system. Do not publish default or real credentials in a public repository.
 
-## 7. Testing and quality assurance
+## 6. Testing and quality assurance
 
 Testing evidence must record the date, environment, expected result, actual result, pass/fail outcome, defects and corrective action. Complete this table with executed results before submission.
 
@@ -133,7 +171,7 @@ Testing evidence must record the date, environment, expected result, actual resu
 | TC-05   | Knowledge search               | Relevant visible article can be found and opened.           | **[Record result]** | **[Pass/Fail]** |
 | TC-06   | Production smoke test          | Deployed URL loads and core ticket workflow works.          | **[Record result]** | **[Pass/Fail]** |
 
-## 8. Technical debt register
+## 7. Technical debt register
 
 | Debt                                     | Cause                                                 | Impact                                                  | Priority | Proposed resolution                                                                |
 | ---------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------- |
@@ -142,20 +180,21 @@ Testing evidence must record the date, environment, expected result, actual resu
 | Documentation placeholders               | Personal/deployment details are pending verification. | Submission evidence is incomplete if left unresolved.   | Critical | Replace all bracketed placeholders and validate links before Sakai submission.     |
 | Broad upstream feature set               | The base platform exceeds examination scope.          | Reviewers may not distinguish reused and original work. | High     | Maintain a change log and clearly document every student-authored adaptation.      |
 
-## 9. Deployment and access details
+## 8. Deployment and access details
 
-| Item             | Value                              |
-| ---------------- | ---------------------------------- |
-| Live application | **[Add URL]**                      |
-| Admin URL        | **[Add URL]**                      |
-| Test username    | **[Provide securely to examiner]** |
-| Test password    | **[Provide securely to examiner]** |
-| Admin username   | **[Provide securely to examiner]** |
-| Admin password   | **[Provide securely to examiner]** |
+ICCTECH is deployed on a Linode cloud server using a Linux-based environment, PHP, MySQL and a web server. The deployed system is remotely accessible at [http://45.79.223.146:8080/index.php](http://45.79.223.146:8080/index.php).
+
+| Item             | Value                                                                      |
+| ---------------- | -------------------------------------------------------------------------- |
+| Live application | [http://45.79.223.146:8080/index.php](http://45.79.223.146:8080/index.php) |
+| Test username    | **[Provide securely to examiner]**                                         |
+| Test password    | **[Provide securely to examiner]**                                         |
+| Admin username   | **[Provide securely to examiner]**                                         |
+| Admin password   | **[Provide securely to examiner]**                                         |
 
 Before submitting, verify the deployed application, database connectivity, role access and examiner credentials. Keep the deployment accessible for grading.
 
-## 10. Maintenance, future evolution and limitations
+## 9. Maintenance, future evolution and limitations
 
 ### Maintenance strategy
 
