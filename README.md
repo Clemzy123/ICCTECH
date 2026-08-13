@@ -67,11 +67,11 @@ To deliver and document a deployable ITSM solution that improves the recording, 
 
 ### Non-functional requirements
 
-- **Usability:** core ticket actions should be understandable without specialist training.
-- **Security:** authenticated access, role-based permissions, input validation and secure handling of configuration secrets are required.
-- **Reliability:** data must persist in MySQL and failures must produce actionable messages.
-- **Compatibility:** the solution must run on PHP 7.4–8.4 with MySQL 8.0+ and a PHP-capable web server.
-- **Deployability:** a local Docker-based setup must be available; the live deployment URL must be verified before submission.
+- **Usability:** Core service-desk functions such as creating, assigning, updating and resolving tickets shall be easy to understand and use without requiring specialist technical training.
+- **Security:** The system shall require authenticated access and enforce role-based permissions for administrators, analysts and end users. User input shall be validated, and sensitive configuration information shall be handled securely.
+- **Reliability:** Application data shall be persistently stored in the MySQL database so that tickets, users, assets and other operational records remain available between sessions. System errors shall provide meaningful information to support troubleshooting.
+- **Compatibility:** The solution shall operate within a Linux-based web-server environment supporting PHP 7.4–8.4 and MySQL 8.0 or later and shall be accessible through commonly used web browsers.
+- **Deployability:** The application shall be capable of being deployed to a cloud-hosted web server for remote access. The final ICCTECH solution is deployed on a Linode cloud server and is accessible through the verified live application URL: http://45.79.223.146:8080/index.php.
 
 ### Prioritisation method
 
