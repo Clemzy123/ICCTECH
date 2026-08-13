@@ -44,22 +44,12 @@ To deliver and document a deployable ITSM solution that improves the recording, 
 
 ## 2. Scope and features
 
-The examination scope focuses on a working service-desk workflow rather than attempting to claim authorship of, or independently recreate, the complete upstream platform.
-
-### In-scope capabilities
-
 - Authentication and role-based access for analysts and end users.
 - Ticket logging, categorisation, assignment, communication, status tracking and resolution.
 - End-user self-service portal and knowledge-base access.
 - Asset records associated with support operations.
 - Administrative configuration, basic audit/reporting views and database-backed persistence.
 - Responsive web access through a PHP and MySQL deployment.
-
-### Out of scope for this examination submission
-
-- Development of every module and integration present in the upstream FreeITSM platform.
-- Production-scale integrations requiring external credentials, such as enterprise SSO, email, WhatsApp, Slack, Intune or AI providers, unless separately configured and evidenced.
-- A claim that the entire upstream application was developed during the 48-hour examination period.
 
 ## 3. Requirements and SRS summary
 
