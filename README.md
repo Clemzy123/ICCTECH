@@ -207,19 +207,3 @@ Before submitting, verify the deployed application, database connectivity, role 
 ### Limitations
 
 This submission is intentionally restricted to the documented core workflow and timeboxed adaptation work. Features inherited from the upstream codebase are not evidence of individual development unless separately documented with commit history, design rationale and testing evidence.
-
-## 11. Third-party reuse and attribution
-
-ICCTECH is an adaptation/deployment project based on [FreeITSM](https://github.com/edmozley/freeitsm), an MIT-licensed open-source IT Service Management platform created by its original maintainer, Ed Mozley. FreeITSM and its original author retain their attribution and copyright notices.
-
-`Clemzy123` is the owner of this repository and the student developer responsible for the examination-specific scoping, configuration, deployment, validation, documentation and any separately identified changes. This README does not claim sole authorship of the upstream FreeITSM platform. All significant reused work must be disclosed and referenced in the final examination submission.
-
-## 12. References
-
-- University of Ghana, CSCD602 Advanced Software Engineering individual project examination brief, 2025/2026.
-- [FreeITSM upstream repository](https://github.com/edmozley/freeitsm).
-- [FreeITSM MIT licence](LICENSE).
-
-## Licence
-
-This repository retains the existing [MIT License](LICENSE). See the licence and upstream notices for full terms.
