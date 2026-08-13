@@ -208,12 +208,13 @@ ICCTECH is deployed on a Linode cloud server using a Linux-based environment, PH
 | Item             | Value                                                                      |
 | ---------------- | -------------------------------------------------------------------------- |
 | Live application | [http://45.79.223.146:8080/index.php](http://45.79.223.146:8080/index.php) |
-| Test username    | **[Provide securely to examiner]**                                         |
-| Test password    | **[Provide securely to examiner]**                                         |
-| Admin username   | **[Provide securely to examiner]**                                         |
-| Admin password   | **[Provide securely to examiner]**                                         |
+| Admin URL        | [http://45.79.223.146:8080/index.php](http://45.79.223.146:8080/index.php) |
+| Test username    | `admin`                                                                    |
+| Test password    | `freeitsm`                                                                 |
+| Admin username   | `admin`                                                                    |
+| Admin password   | `freeitsm`                                                                 |
 
-Before submitting, verify the deployed application, database connectivity, role access and examiner credentials. Keep the deployment accessible for grading.
+Before submitting, verify the deployed application, database connectivity, role access and examiner credentials. Keep the deployment accessible for grading. Change these default credentials after grading or before any public/long-term deployment.
 
 ## 9. Maintenance, future evolution and limitations
 
