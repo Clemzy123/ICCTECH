@@ -6,15 +6,15 @@
 | Item                              | Details                                                              |
 | --------------------------------- | -------------------------------------------------------------------- |
 | Student developer / project owner | [Clemzy123](https://github.com/Clemzy123)                            |
-| Student name                      | **[Clement Asamoah]**                                                |
-| Student ID                        | **[22424193]**                                                       |
+| Student name                      | **Clement Asamoah**                                                  |
+| Student ID                        | **22424193**                                                         |
 | Project status                    | Functional adaptation and deployment project                         |
-| Live application                  | **[Add deployed application URL]**                                   |
+| Live application                  | **http://45.79.223.146:8080/index.php**                              |
 | Source repository                 | [github.com/Clemzy123/ICCTECH](https://github.com/Clemzy123/ICCTECH) |
 
 ## 1. Project overview
 
-ICCTECH is an adapted, self-hosted IT Service Management (ITSM) solution for organisations that need a central place to log, assign, track and resolve IT support requests. The project configures and deploys a usable service-management environment based on the FreeITSM open-source platform, with a focused evaluation scope suitable for the CSCD602 48-hour capstone examination.
+ICCTECH is an adapted, self-hosted IT Service Management (ITSM) solution for organisations that need a central place to log, assign, track and resolve IT support requests.
 
 ### Problem statement
 
