@@ -144,19 +144,40 @@ The detailed SRS, use cases, data model, UI evidence and selected design diagram
 
 ## 5. Technology and local setup
 
-- PHP 7.4–8.4
-- MySQL 8.0+
-- Apache or another PHP-capable web server
-- Vanilla JavaScript and TinyMCE
-- Docker Compose (recommended for local evaluation)
+### Technology stack
+
+- PHP 8.4 with Apache HTTP Server
+- MySQL 8.0
+- PDO with the `pdo_mysql` database driver
+- Required PHP extensions: cURL, OpenSSL and Mbstring
+- Optional PHP extension: IMAP for IMAP mailbox collection
+- HTML, CSS, vanilla JavaScript and TinyMCE
+- Docker and Docker Compose for containerised deployment
+- Docker volumes for database data, attachments and encryption keys
+
+### Prerequisites
+
+Install Git, Docker Engine and Docker Compose. Ensure ports `8080` and `3307` are available on the local computer.
+
+### Docker-based local setup
 
 ```bash
 git clone https://github.com/Clemzy123/ICCTECH.git
 cd ICCTECH
-docker compose up -d
+docker compose up --build -d
 ```
 
-Open `http://localhost:8080/setup/` to complete local installation. Configure the database and application secrets before using the system. Do not publish default or real credentials in a public repository.
+Docker Compose builds the Apache/PHP application container, starts MySQL 8.0 and imports the initial schema from `database/freeitsm.sql`. The first application-container startup also generates an encryption key in its persistent Docker volume.
+
+### Verify the installation
+
+Run `docker compose ps` to confirm that the application and database containers are running. Open [http://localhost:8080/setup/](http://localhost:8080/setup/) to check the PHP environment, database connection, encryption key and database schema. The setup page verifies the installation; the database schema is imported automatically when the MySQL data volume is first created.
+
+After the checks pass, open [http://localhost:8080/](http://localhost:8080/) to use the application. Use `docker compose logs` when troubleshooting container startup or database-connection problems.
+
+### Local configuration and security
+
+The credentials in `docker-compose.yml` and the initial administrator account are development defaults intended only for local evaluation. Replace all default database and administrator passwords before any public or production deployment. Supply production secrets through protected environment configuration, restrict database exposure and never commit passwords, encryption keys or other credentials to the repository.
 
 ## 6. Testing and quality assurance
 
