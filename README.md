@@ -1,4 +1,4 @@
-# ICCTECH: Adapted IT Service Management Solution
+# ICCTECH: IT Service Management Solution
 
 > **University of Ghana — CSCD602 Advanced Software Engineering**<br>
 > Individual Project-Based Examination, First Semester 2025/2026
@@ -14,7 +14,7 @@
 
 ## 1. Project overview
 
-ICCTECH is an adapted, self-hosted IT Service Management (ITSM) solution for organisations that need a central place to log, assign, track and resolve IT support requests.
+ICCTECH is a self-hosted IT Service Management (ITSM) solution for organisations that need a central place to log, assign, track and resolve IT support requests.
 
 ### Problem statement
 
@@ -27,7 +27,7 @@ To deliver and document a deployable ITSM solution that improves the recording, 
 ### Objectives
 
 - Analyse the support-management problem and define prioritised requirements.
-- Configure, adapt and deploy the selected ITSM platform for the identified use case.
+- Design and implement the core architecture and workflows required for the ICCTECH IT Service Management system.
 - Demonstrate core ticket, user-access, knowledge and asset-management workflows.
 - Test the implemented scope and document defects, limitations and technical debt.
 - Produce a maintainable deployment and an evolution plan.
