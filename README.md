@@ -1,4 +1,4 @@
-# ICCTECH: IT Service Management Solution
+# ICCTECH IT Service Management
 
 > **University of Ghana — CSCD602 Advanced Software Engineering**<br>
 > Individual Project-Based Examination, First Semester 2025/2026
